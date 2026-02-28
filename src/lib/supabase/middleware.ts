@@ -36,7 +36,7 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Public routes that don't require authentication
-  const publicRoutes = ["/login", "/api/webhooks/resend", "/unsubscribe"];
+  const publicRoutes = ["/login", "/api/webhooks/resend", "/unsubscribe", "/s/", "/confirm", "/api/subscribe"];
   const isPublicRoute = publicRoutes.some(
     (route) => pathname === route || pathname.startsWith(route)
   );

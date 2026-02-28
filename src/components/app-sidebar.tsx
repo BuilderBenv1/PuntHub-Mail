@@ -22,6 +22,7 @@ const navItems = [
   { title: "Subscribers", href: "/subscribers", icon: "👥" },
   { title: "Lists", href: "/tags", icon: "🏷️" },
   { title: "Campaigns", href: "/campaigns", icon: "📧" },
+  { title: "Forms", href: "/forms", icon: "📝" },
   { title: "API Keys", href: "/api-keys", icon: "🔑" },
 ];
 
