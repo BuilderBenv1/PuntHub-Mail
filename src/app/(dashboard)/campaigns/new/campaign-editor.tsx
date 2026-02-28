@@ -1,0 +1,384 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import {
+  saveDraft,
+  getRecipientCount,
+  sendCampaignNow,
+  scheduleCampaign,
+} from "../actions";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+
+type Tag = { id: string; name: string };
+
+export function CampaignEditor({
+  tags,
+  existingCampaign,
+}: {
+  tags: Tag[];
+  existingCampaign: any | null;
+}) {
+  const [campaignId, setCampaignId] = useState<string | null>(
+    existingCampaign?.id || null
+  );
+  const [subject, setSubject] = useState(existingCampaign?.subject || "");
+  const [previewText, setPreviewText] = useState(existingCampaign?.preview_text || "");
+  const [fromName, setFromName] = useState(existingCampaign?.from_name || "PuntHub");
+  const [fromEmail, setFromEmail] = useState(
+    existingCampaign?.from_email || "news@punthub.co.uk"
+  );
+  const [replyTo, setReplyTo] = useState(existingCampaign?.reply_to || "");
+  const [htmlBody, setHtmlBody] = useState(existingCampaign?.html_body || "");
+  const [includeTagIds, setIncludeTagIds] = useState<string[]>(
+    existingCampaign?.tag_ids || []
+  );
+  const [excludeTagIds, setExcludeTagIds] = useState<string[]>(
+    existingCampaign?.exclude_tag_ids || []
+  );
+  const [recipientCount, setRecipientCount] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendConfirmOpen, setSendConfirmOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState("");
+  const [showPreview, setShowPreview] = useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const updateRecipientCount = useCallback(async () => {
+    const count = await getRecipientCount(includeTagIds, excludeTagIds);
+    setRecipientCount(count);
+  }, [includeTagIds, excludeTagIds]);
+
+  useEffect(() => {
+    updateRecipientCount();
+  }, [updateRecipientCount]);
+
+  function toggleTag(tagId: string, list: "include" | "exclude") {
+    if (list === "include") {
+      setIncludeTagIds((prev) =>
+        prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
+      );
+      // Remove from exclude if present
+      setExcludeTagIds((prev) => prev.filter((id) => id !== tagId));
+    } else {
+      setExcludeTagIds((prev) =>
+        prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
+      );
+      // Remove from include if present
+      setIncludeTagIds((prev) => prev.filter((id) => id !== tagId));
+    }
+  }
+
+  async function handleSaveDraft(): Promise<string | null> {
+    if (!subject.trim()) {
+      toast({ title: "Subject is required", variant: "destructive" });
+      return null;
+    }
+
+    setSaving(true);
+    const formData = new FormData();
+    if (campaignId) formData.set("id", campaignId);
+    formData.set("subject", subject);
+    formData.set("preview_text", previewText);
+    formData.set("from_name", fromName);
+    formData.set("from_email", fromEmail);
+    formData.set("reply_to", replyTo);
+    formData.set("html_body", htmlBody);
+    formData.set("tag_ids", JSON.stringify(includeTagIds));
+    formData.set("exclude_tag_ids", JSON.stringify(excludeTagIds));
+
+    const result = await saveDraft(formData);
+    setSaving(false);
+
+    if (result.error) {
+      toast({ title: "Error", description: result.error, variant: "destructive" });
+      return null;
+    }
+
+    setCampaignId(result.id!);
+    toast({ title: "Draft saved" });
+    return result.id!;
+  }
+
+  async function handleSendNow() {
+    const savedId = await handleSaveDraft();
+    if (!savedId) return;
+
+    setSending(true);
+    const result = await sendCampaignNow(savedId);
+    setSending(false);
+    setSendConfirmOpen(false);
+
+    if (result.error) {
+      toast({ title: "Error", description: result.error, variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "Campaign sent", description: `${result.sent} emails sent` });
+    router.push("/campaigns");
+  }
+
+  async function handleSchedule() {
+    if (!scheduleDate) {
+      toast({ title: "Pick a date and time", variant: "destructive" });
+      return;
+    }
+
+    const savedId = await handleSaveDraft();
+    if (!savedId) return;
+
+    setSending(true);
+    const result = await scheduleCampaign(savedId, new Date(scheduleDate).toISOString());
+    setSending(false);
+    setScheduleOpen(false);
+
+    if (result.error) {
+      toast({ title: "Error", description: result.error, variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "Campaign scheduled" });
+    router.push("/campaigns");
+  }
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      {/* Left: Editor */}
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Campaign Details</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Subject</Label>
+              <Input
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="Your email subject line"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Preview Text</Label>
+              <Input
+                value={previewText}
+                onChange={(e) => setPreviewText(e.target.value)}
+                placeholder="Shows in email client preview"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>From Name</Label>
+                <Input
+                  value={fromName}
+                  onChange={(e) => setFromName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>From Email</Label>
+                <Input
+                  value={fromEmail}
+                  onChange={(e) => setFromEmail(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Reply-To (optional)</Label>
+              <Input
+                value={replyTo}
+                onChange={(e) => setReplyTo(e.target.value)}
+                placeholder="reply@example.com"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>List Targeting</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label className="mb-2 block">Include Lists (send to subscribers on these lists)</Label>
+              <div className="flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <Badge
+                    key={tag.id}
+                    variant={includeTagIds.includes(tag.id) ? "default" : "outline"}
+                    className="cursor-pointer"
+                    onClick={() => toggleTag(tag.id, "include")}
+                  >
+                    {tag.name}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label className="mb-2 block">Exclude Lists (skip subscribers on these lists)</Label>
+              <div className="flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <Badge
+                    key={tag.id}
+                    variant={excludeTagIds.includes(tag.id) ? "destructive" : "outline"}
+                    className="cursor-pointer"
+                    onClick={() => toggleTag(tag.id, "exclude")}
+                  >
+                    {tag.name}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+            <Separator />
+            <div className="text-center">
+              <p className="text-2xl font-bold">{recipientCount}</p>
+              <p className="text-sm text-muted-foreground">recipients</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>HTML Body</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              value={htmlBody}
+              onChange={(e) => setHtmlBody(e.target.value)}
+              placeholder="Paste your HTML email here..."
+              className="min-h-[300px] font-mono text-sm"
+            />
+          </CardContent>
+        </Card>
+
+        {/* Action buttons */}
+        <div className="flex flex-wrap gap-3">
+          <Button variant="outline" onClick={handleSaveDraft} disabled={saving}>
+            {saving ? "Saving..." : "Save Draft"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setShowPreview(!showPreview)}
+          >
+            {showPreview ? "Hide Preview" : "Show Preview"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setScheduleOpen(true)}
+            disabled={!subject.trim() || recipientCount === 0}
+          >
+            Schedule
+          </Button>
+          <Button
+            onClick={() => setSendConfirmOpen(true)}
+            disabled={!subject.trim() || recipientCount === 0}
+          >
+            Send Now
+          </Button>
+        </div>
+      </div>
+
+      {/* Right: Preview */}
+      <div>
+        {showPreview && (
+          <Card className="sticky top-6">
+            <CardHeader>
+              <CardTitle>Preview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-4 space-y-1 text-sm">
+                <p>
+                  <span className="text-muted-foreground">From:</span>{" "}
+                  {fromName} &lt;{fromEmail}&gt;
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Subject:</span>{" "}
+                  {subject}
+                </p>
+                {previewText && (
+                  <p>
+                    <span className="text-muted-foreground">Preview:</span>{" "}
+                    {previewText}
+                  </p>
+                )}
+              </div>
+              <Separator className="mb-4" />
+              <div
+                className="prose prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: htmlBody }}
+              />
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Send confirmation dialog */}
+      <Dialog open={sendConfirmOpen} onOpenChange={setSendConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send campaign now?</DialogTitle>
+            <DialogDescription>
+              This will send &quot;{subject}&quot; to{" "}
+              <strong>{recipientCount}</strong> recipient
+              {recipientCount !== 1 ? "s" : ""}. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSendConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSendNow} disabled={sending}>
+              {sending ? "Sending..." : `Send to ${recipientCount} recipients`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Schedule dialog */}
+      <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Schedule campaign</DialogTitle>
+            <DialogDescription>
+              Choose when to send &quot;{subject}&quot; to{" "}
+              <strong>{recipientCount}</strong> recipients.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label>Send at</Label>
+            <Input
+              type="datetime-local"
+              value={scheduleDate}
+              onChange={(e) => setScheduleDate(e.target.value)}
+              className="mt-2"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setScheduleOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSchedule} disabled={sending || !scheduleDate}>
+              {sending ? "Scheduling..." : "Schedule"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
