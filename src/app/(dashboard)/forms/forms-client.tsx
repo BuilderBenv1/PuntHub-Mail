@@ -25,9 +25,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
 type Tag = { id: string; name: string };
+type Template = { id: string; name: string };
 type Form = {
   id: string;
   name: string;
@@ -38,6 +46,7 @@ type Form = {
   success_message: string;
   tag_ids: string[];
   redirect_url: string | null;
+  welcome_template_id: string | null;
   active: boolean;
   created_at: string;
 };
@@ -45,9 +54,11 @@ type Form = {
 export function FormsClient({
   initialForms,
   tags,
+  templates,
 }: {
   initialForms: Form[];
   tags: Tag[];
+  templates: Template[];
 }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [editForm, setEditForm] = useState<Form | null>(null);
@@ -55,6 +66,7 @@ export function FormsClient({
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const router = useRouter();
   const { toast } = useToast();
 
@@ -66,6 +78,7 @@ export function FormsClient({
 
   async function handleCreate(formData: FormData) {
     formData.set("tag_ids", JSON.stringify(selectedTagIds));
+    formData.set("welcome_template_id", selectedTemplateId === "none" ? "" : selectedTemplateId);
     setLoading(true);
     const result = await createForm(formData);
     setLoading(false);
@@ -75,6 +88,7 @@ export function FormsClient({
     }
     setCreateOpen(false);
     setSelectedTagIds([]);
+    setSelectedTemplateId("");
     toast({ title: "Form created" });
     router.refresh();
   }
@@ -83,6 +97,7 @@ export function FormsClient({
     if (!editForm) return;
     formData.set("tag_ids", JSON.stringify(selectedTagIds));
     formData.set("active", editForm.active ? "true" : "false");
+    formData.set("welcome_template_id", selectedTemplateId === "none" ? "" : selectedTemplateId);
     setLoading(true);
     const result = await updateForm(editForm.id, formData);
     setLoading(false);
@@ -92,6 +107,7 @@ export function FormsClient({
     }
     setEditForm(null);
     setSelectedTagIds([]);
+    setSelectedTemplateId("");
     toast({ title: "Form updated" });
     router.refresh();
   }
@@ -112,6 +128,7 @@ export function FormsClient({
   function openEdit(form: Form) {
     setEditForm(form);
     setSelectedTagIds(form.tag_ids || []);
+    setSelectedTemplateId(form.welcome_template_id || "");
   }
 
   function getEmbedCode(form: Form) {
@@ -173,6 +190,25 @@ export function FormsClient({
           {tags.length === 0 && <p className="text-sm text-muted-foreground">No lists created yet.</p>}
         </div>
       </div>
+      <div className="space-y-2">
+        <Label>Welcome Template</Label>
+        <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+          <SelectTrigger>
+            <SelectValue placeholder="No welcome email" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">No welcome email</SelectItem>
+            {templates.map((template) => (
+              <SelectItem key={template.id} value={template.id}>
+                {template.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Send a welcome email when a subscriber confirms via this form.
+        </p>
+      </div>
     </>
   );
 
@@ -182,7 +218,7 @@ export function FormsClient({
         <p className="text-sm text-muted-foreground">
           {initialForms.length} form{initialForms.length !== 1 ? "s" : ""}
         </p>
-        <Dialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) setSelectedTagIds([]); }}>
+        <Dialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) { setSelectedTagIds([]); setSelectedTemplateId(""); } }}>
           <DialogTrigger asChild>
             <Button>Create Form</Button>
           </DialogTrigger>
@@ -262,7 +298,7 @@ export function FormsClient({
       )}
 
       {/* Edit dialog */}
-      <Dialog open={!!editForm} onOpenChange={(o) => { if (!o) { setEditForm(null); setSelectedTagIds([]); } }}>
+      <Dialog open={!!editForm} onOpenChange={(o) => { if (!o) { setEditForm(null); setSelectedTagIds([]); setSelectedTemplateId(""); } }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Form</DialogTitle>

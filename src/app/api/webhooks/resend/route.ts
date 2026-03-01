@@ -92,28 +92,42 @@ export async function POST(request: NextRequest) {
     }
 
     case "email.clicked": {
+      // Note: Primary click tracking is handled by /api/track/click endpoint.
+      // This webhook handler serves as a fallback for any clicks Resend reports
+      // directly (e.g. if a link was not rewritten for tracking).
+      // The .is("clicked_at", null) guard prevents double-counting.
       await supabase
         .from("send_events")
         .update({ clicked_at: now })
         .eq("id", sendEvent.id)
         .is("clicked_at", null);
 
-      const { data: stats } = await supabase
-        .from("campaign_stats")
-        .select("clicked")
-        .eq("campaign_id", sendEvent.campaign_id)
+      // Only increment stats if clicked_at was actually updated (not already set)
+      const { data: updatedEvent } = await supabase
+        .from("send_events")
+        .select("clicked_at")
+        .eq("id", sendEvent.id)
         .single();
-      if (stats) {
-        await supabase
-          .from("campaign_stats")
-          .update({ clicked: stats.clicked + 1, updated_at: now })
-          .eq("campaign_id", sendEvent.campaign_id);
-      }
 
-      await supabase
-        .from("subscribers")
-        .update({ last_clicked_at: now })
-        .eq("id", sendEvent.subscriber_id);
+      // If clicked_at matches `now`, this webhook set it (not the tracking endpoint)
+      if (updatedEvent?.clicked_at === now) {
+        const { data: stats } = await supabase
+          .from("campaign_stats")
+          .select("clicked")
+          .eq("campaign_id", sendEvent.campaign_id)
+          .single();
+        if (stats) {
+          await supabase
+            .from("campaign_stats")
+            .update({ clicked: stats.clicked + 1, updated_at: now })
+            .eq("campaign_id", sendEvent.campaign_id);
+        }
+
+        await supabase
+          .from("subscribers")
+          .update({ last_clicked_at: now })
+          .eq("id", sendEvent.subscriber_id);
+      }
       break;
     }
 

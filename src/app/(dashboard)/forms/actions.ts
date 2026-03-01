@@ -23,6 +23,7 @@ export async function createForm(formData: FormData) {
   const success_message = (formData.get("success_message") as string) || "Check your email to confirm your subscription!";
   const tag_ids = JSON.parse((formData.get("tag_ids") as string) || "[]");
   const redirect_url = (formData.get("redirect_url") as string) || null;
+  const welcome_template_id = (formData.get("welcome_template_id") as string) || null;
 
   const { error } = await supabase.from("signup_forms").insert({
     name,
@@ -33,6 +34,7 @@ export async function createForm(formData: FormData) {
     success_message,
     tag_ids,
     redirect_url,
+    welcome_template_id,
   });
 
   if (error) {
@@ -56,10 +58,11 @@ export async function updateForm(id: string, formData: FormData) {
   const tag_ids = JSON.parse((formData.get("tag_ids") as string) || "[]");
   const redirect_url = (formData.get("redirect_url") as string) || null;
   const active = formData.get("active") === "true";
+  const welcome_template_id = (formData.get("welcome_template_id") as string) || null;
 
   const { error } = await supabase
     .from("signup_forms")
-    .update({ name, slug, heading, description, button_text, success_message, tag_ids, redirect_url, active })
+    .update({ name, slug, heading, description, button_text, success_message, tag_ids, redirect_url, active, welcome_template_id })
     .eq("id", id);
 
   if (error) return { error: error.message };
@@ -79,5 +82,14 @@ export async function deleteForm(id: string) {
 export async function getAllTags() {
   const supabase = createServiceClient();
   const { data } = await supabase.from("tags").select("id, name").order("name");
+  return data || [];
+}
+
+export async function getAllTemplates() {
+  const supabase = createServiceClient();
+  const { data } = await supabase
+    .from("email_templates")
+    .select("id, name")
+    .order("name");
   return data || [];
 }

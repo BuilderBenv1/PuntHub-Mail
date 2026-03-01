@@ -21,7 +21,10 @@ const navItems = [
   { title: "Dashboard", href: "/", icon: "📊" },
   { title: "Subscribers", href: "/subscribers", icon: "👥" },
   { title: "Lists", href: "/tags", icon: "🏷️" },
+  { title: "Segments", href: "/segments", icon: "🔀" },
   { title: "Campaigns", href: "/campaigns", icon: "📧" },
+  { title: "Automations", href: "/automations", icon: "⚡" },
+  { title: "Templates", href: "/templates", icon: "📄" },
   { title: "Forms", href: "/forms", icon: "📝" },
   { title: "API Keys", href: "/api-keys", icon: "🔑" },
 ];

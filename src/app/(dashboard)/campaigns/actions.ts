@@ -3,6 +3,7 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { Resend } from "resend";
+import { rewriteLinksForTracking } from "@/lib/track-links";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -224,6 +225,9 @@ export async function sendCampaignNow(campaignId: string) {
     .from("campaign_stats")
     .upsert({ campaign_id: campaignId, opened: 0, clicked: 0, bounced: 0, complained: 0, unsubscribed: 0 }, { onConflict: "campaign_id" });
 
+  // Rewrite links for click tracking
+  const trackedHtml = await rewriteLinksForTracking(campaign.html_body, campaignId, null, supabase);
+
   // Send in batches of 100 with 500ms delay
   let totalSent = 0;
 
@@ -231,11 +235,10 @@ export async function sendCampaignNow(campaignId: string) {
     const batch = recipients.slice(i, i + 100);
 
     for (const recipient of batch) {
-      // Replace unsubscribe token in HTML
-      const html = campaign.html_body.replace(
-        /\{unsubscribe_token\}/g,
-        recipient.unsubscribe_token
-      );
+      // Replace unsubscribe token and subscriber_id placeholders in HTML
+      const html = trackedHtml
+        .replace(/\{unsubscribe_token\}/g, recipient.unsubscribe_token)
+        .replace(/\{subscriber_id\}/g, recipient.id);
 
       try {
         const { data: emailResult } = await resend.emails.send({
@@ -316,4 +319,158 @@ export async function deleteCampaign(id: string) {
 
   revalidatePath("/campaigns");
   return { success: true };
+}
+
+export async function sendTestEmail(params: {
+  to: string;
+  subject: string;
+  html: string;
+  from_name: string;
+  from_email: string;
+}) {
+  try {
+    const { error } = await resend.emails.send({
+      from: `${params.from_name} <${params.from_email}>`,
+      to: params.to,
+      subject: params.subject,
+      html: params.html,
+    });
+    if (error) return { error: error.message };
+    return { success: true };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+}
+
+export async function duplicateCampaign(id: string) {
+  const supabase = createServiceClient();
+
+  const { data: campaign } = await supabase
+    .from("campaigns")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (!campaign) return { error: "Campaign not found" };
+
+  const { data: newCampaign, error } = await supabase
+    .from("campaigns")
+    .insert({
+      subject: `${campaign.subject} (Copy)`,
+      preview_text: campaign.preview_text,
+      html_body: campaign.html_body,
+      from_name: campaign.from_name,
+      from_email: campaign.from_email,
+      reply_to: campaign.reply_to,
+      tag_ids: campaign.tag_ids,
+      exclude_tag_ids: campaign.exclude_tag_ids,
+      status: "draft",
+    })
+    .select()
+    .single();
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/campaigns");
+  return { success: true, id: newCampaign.id };
+}
+
+export async function resendToNonOpeners(campaignId: string, newSubject: string) {
+  const supabase = createServiceClient();
+
+  const { data: campaign } = await supabase
+    .from("campaigns")
+    .select("*")
+    .eq("id", campaignId)
+    .single();
+
+  if (!campaign) return { error: "Campaign not found" };
+
+  // Find send events where opened_at is null
+  const { data: nonOpenerEvents } = await supabase
+    .from("send_events")
+    .select("subscriber_id, subscribers(id, email, status, unsubscribe_token)")
+    .eq("campaign_id", campaignId)
+    .is("opened_at", null);
+
+  const activeNonOpeners = (nonOpenerEvents || [])
+    .filter((e: any) => e.subscribers?.status === "active")
+    .map((e: any) => e.subscribers);
+
+  if (activeNonOpeners.length === 0) return { error: "No non-openers found" };
+
+  // Create a new campaign for the resend
+  const { data: newCampaign, error: createErr } = await supabase
+    .from("campaigns")
+    .insert({
+      subject: newSubject,
+      preview_text: campaign.preview_text,
+      html_body: campaign.html_body,
+      from_name: campaign.from_name,
+      from_email: campaign.from_email,
+      reply_to: campaign.reply_to,
+      tag_ids: campaign.tag_ids,
+      exclude_tag_ids: campaign.exclude_tag_ids,
+      status: "sent",
+      sent_at: new Date().toISOString(),
+      total_recipients: 0,
+    })
+    .select()
+    .single();
+
+  if (createErr || !newCampaign) return { error: createErr?.message || "Failed to create resend campaign" };
+
+  await supabase.from("campaign_stats").insert({
+    campaign_id: newCampaign.id,
+    opened: 0, clicked: 0, bounced: 0, complained: 0, unsubscribed: 0,
+  });
+
+  // Rewrite links for click tracking on the new resend campaign
+  const trackedHtml = await rewriteLinksForTracking(campaign.html_body, newCampaign.id, null, supabase);
+
+  let totalSent = 0;
+
+  for (let i = 0; i < activeNonOpeners.length; i += 100) {
+    const batch = activeNonOpeners.slice(i, i + 100);
+    for (const recipient of batch) {
+      const html = trackedHtml
+        .replace(/\{unsubscribe_token\}/g, recipient.unsubscribe_token)
+        .replace(/\{subscriber_id\}/g, recipient.id);
+      try {
+        const { data: emailResult } = await resend.emails.send({
+          from: `${campaign.from_name} <${campaign.from_email}>`,
+          to: recipient.email,
+          subject: newSubject,
+          html,
+          replyTo: campaign.reply_to || undefined,
+        });
+        await supabase.from("send_events").insert({
+          campaign_id: newCampaign.id,
+          subscriber_id: recipient.id,
+          resend_email_id: emailResult?.id || null,
+          sent_at: new Date().toISOString(),
+        });
+        totalSent++;
+      } catch (err: any) {
+        console.error(`Failed to resend to ${recipient.email}:`, err.message);
+      }
+    }
+    if (i + 100 < activeNonOpeners.length) await sleep(500);
+  }
+
+  await supabase.from("campaigns").update({ total_recipients: totalSent }).eq("id", newCampaign.id);
+
+  revalidatePath("/campaigns");
+  return { success: true, sent: totalSent, newCampaignId: newCampaign.id };
+}
+
+export async function getNonOpenerCount(campaignId: string) {
+  const supabase = createServiceClient();
+  const { data } = await supabase
+    .from("send_events")
+    .select("subscriber_id, subscribers!inner(status)")
+    .eq("campaign_id", campaignId)
+    .is("opened_at", null)
+    .eq("subscribers.status", "active");
+  return data?.length ?? 0;
 }

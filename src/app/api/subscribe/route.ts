@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     // Reset to pending
     await supabase
       .from("subscribers")
-      .update({ status: "pending", name: name || undefined })
+      .update({ status: "pending", name: name || undefined, signup_form_id: form_id || undefined })
       .eq("id", existing.id);
   } else {
     // Create new subscriber as pending
@@ -76,6 +76,7 @@ export async function POST(request: NextRequest) {
         email: normalizedEmail,
         name: name || null,
         status: "pending",
+        signup_form_id: form_id || null,
       })
       .select()
       .single();

@@ -3,24 +3,16 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { cancelScheduledCampaign, deleteCampaign } from "./actions";
+import { cancelScheduledCampaign, deleteCampaign, duplicateCampaign, resendToNonOpeners, getNonOpenerCount } from "./actions";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 
@@ -33,6 +25,9 @@ const statusVariant: Record<string, any> = {
 
 export function CampaignsClient({ campaigns }: { campaigns: any[] }) {
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [resendOpen, setResendOpen] = useState<string | null>(null);
+  const [resendSubject, setResendSubject] = useState("");
+  const [nonOpenerCount, setNonOpenerCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
@@ -41,42 +36,55 @@ export function CampaignsClient({ campaigns }: { campaigns: any[] }) {
     setLoading(true);
     const result = await cancelScheduledCampaign(id);
     setLoading(false);
-    if (result.error) {
-      toast({ title: "Error", description: result.error, variant: "destructive" });
-    } else {
-      toast({ title: "Schedule cancelled" });
-      router.refresh();
-    }
+    if (result.error) toast({ title: "Error", description: result.error, variant: "destructive" });
+    else { toast({ title: "Schedule cancelled" }); router.refresh(); }
   }
 
   async function handleDelete(id: string) {
     setLoading(true);
     const result = await deleteCampaign(id);
     setLoading(false);
-    if (result.error) {
-      toast({ title: "Error", description: result.error, variant: "destructive" });
-    } else {
-      setDeleteId(null);
-      toast({ title: "Campaign deleted" });
-      router.refresh();
-    }
+    if (result.error) toast({ title: "Error", description: result.error, variant: "destructive" });
+    else { setDeleteId(null); toast({ title: "Campaign deleted" }); router.refresh(); }
+  }
+
+  async function handleDuplicate(id: string) {
+    setLoading(true);
+    const result = await duplicateCampaign(id);
+    setLoading(false);
+    if (result.error) toast({ title: "Error", description: result.error, variant: "destructive" });
+    else { toast({ title: "Campaign duplicated" }); router.push(`/campaigns/new?id=${result.id}`); }
+  }
+
+  async function openResend(campaign: any) {
+    setResendSubject(campaign.subject);
+    setResendOpen(campaign.id);
+    const count = await getNonOpenerCount(campaign.id);
+    setNonOpenerCount(count);
+  }
+
+  async function handleResend() {
+    if (!resendOpen || !resendSubject.trim()) return;
+    setLoading(true);
+    const result = await resendToNonOpeners(resendOpen, resendSubject);
+    setLoading(false);
+    setResendOpen(null);
+    if (result.error) toast({ title: "Error", description: result.error, variant: "destructive" });
+    else { toast({ title: "Re-sent!", description: `${result.sent} emails sent to non-openers` }); router.refresh(); }
   }
 
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {campaigns.length} campaign{campaigns.length !== 1 ? "s" : ""}
-        </p>
-        <Link href="/campaigns/new">
-          <Button>New Campaign</Button>
-        </Link>
+        <p className="text-sm text-muted-foreground">{campaigns.length} campaign{campaigns.length !== 1 ? "s" : ""}</p>
+        <div className="flex gap-2">
+          <Link href="/campaigns/compare"><Button variant="outline">Compare</Button></Link>
+          <Link href="/campaigns/new"><Button>New Campaign</Button></Link>
+        </div>
       </div>
 
       {campaigns.length === 0 ? (
-        <div className="rounded-lg border p-8 text-center text-muted-foreground">
-          No campaigns yet. Create your first campaign.
-        </div>
+        <div className="rounded-lg border p-8 text-center text-muted-foreground">No campaigns yet.</div>
       ) : (
         <div className="rounded-lg border">
           <Table>
@@ -88,106 +96,37 @@ export function CampaignsClient({ campaigns }: { campaigns: any[] }) {
                 <TableHead className="text-right">Recipients</TableHead>
                 <TableHead className="text-right">Open Rate</TableHead>
                 <TableHead className="text-right">Click Rate</TableHead>
-                <TableHead className="w-[180px]">Actions</TableHead>
+                <TableHead className="w-[260px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {campaigns.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell>
-                    <Link
-                      href={
-                        c.status === "sent"
-                          ? `/campaigns/${c.id}`
-                          : `/campaigns/new?id=${c.id}`
-                      }
-                      className="font-medium hover:underline"
-                    >
-                      {c.subject}
-                    </Link>
+                    <Link href={c.status === "sent" ? `/campaigns/${c.id}` : `/campaigns/new?id=${c.id}`} className="font-medium hover:underline">{c.subject}</Link>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={statusVariant[c.status] || "secondary"}>
-                      {c.status}
-                    </Badge>
+                    <Badge variant={statusVariant[c.status] || "secondary"}>{c.status}</Badge>
                     {c.status === "scheduled" && c.scheduled_at && (
-                      <span className="ml-2 text-xs text-muted-foreground">
-                        {new Date(c.scheduled_at).toLocaleString()}
-                      </span>
+                      <span className="ml-2 text-xs text-muted-foreground">{new Date(c.scheduled_at).toLocaleString()}</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {c.sent_at
-                      ? new Date(c.sent_at).toLocaleDateString()
-                      : "—"}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {c.total_recipients}
-                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{c.sent_at ? new Date(c.sent_at).toLocaleDateString() : "—"}</TableCell>
+                  <TableCell className="text-right">{c.total_recipients}</TableCell>
                   <TableCell className="text-right">{c.openRate}%</TableCell>
                   <TableCell className="text-right">{c.clickRate}%</TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
-                      {c.status === "draft" && (
-                        <Link href={`/campaigns/new?id=${c.id}`}>
-                          <Button size="sm" variant="outline">
-                            Edit
-                          </Button>
-                        </Link>
-                      )}
-                      {c.status === "scheduled" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleCancel(c.id)}
-                          disabled={loading}
-                        >
-                          Cancel
-                        </Button>
-                      )}
+                    <div className="flex flex-wrap gap-1">
+                      {c.status === "draft" && <Link href={`/campaigns/new?id=${c.id}`}><Button size="sm" variant="outline">Edit</Button></Link>}
+                      {c.status === "scheduled" && <Button size="sm" variant="outline" onClick={() => handleCancel(c.id)} disabled={loading}>Cancel</Button>}
                       {c.status === "sent" && (
-                        <Link href={`/campaigns/${c.id}`}>
-                          <Button size="sm" variant="outline">
-                            Stats
-                          </Button>
-                        </Link>
-                      )}
-                      {c.status !== "sent" && (
                         <>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => setDeleteId(c.id)}
-                          >
-                            Delete
-                          </Button>
-                          <Dialog
-                            open={deleteId === c.id}
-                            onOpenChange={(open) => !open && setDeleteId(null)}
-                          >
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Delete campaign?</DialogTitle>
-                                <DialogDescription>
-                                  This will permanently delete &quot;{c.subject}&quot;.
-                                </DialogDescription>
-                              </DialogHeader>
-                              <DialogFooter>
-                                <Button variant="outline" onClick={() => setDeleteId(null)}>
-                                  Cancel
-                                </Button>
-                                <Button
-                                  variant="destructive"
-                                  onClick={() => handleDelete(c.id)}
-                                  disabled={loading}
-                                >
-                                  Delete
-                                </Button>
-                              </DialogFooter>
-                            </DialogContent>
-                          </Dialog>
+                          <Link href={`/campaigns/${c.id}`}><Button size="sm" variant="outline">Stats</Button></Link>
+                          <Button size="sm" variant="outline" onClick={() => openResend(c)}>Re-send</Button>
                         </>
                       )}
+                      <Button size="sm" variant="outline" onClick={() => handleDuplicate(c.id)} disabled={loading}>Duplicate</Button>
+                      {c.status !== "sent" && <Button size="sm" variant="destructive" onClick={() => setDeleteId(c.id)}>Delete</Button>}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -196,6 +135,39 @@ export function CampaignsClient({ campaigns }: { campaigns: any[] }) {
           </Table>
         </div>
       )}
+
+      {/* Delete dialog */}
+      <Dialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Delete campaign?</DialogTitle><DialogDescription>This cannot be undone.</DialogDescription></DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteId(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => deleteId && handleDelete(deleteId)} disabled={loading}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Re-send to non-openers dialog */}
+      <Dialog open={!!resendOpen} onOpenChange={(o) => !o && setResendOpen(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Re-send to Non-Openers</DialogTitle>
+            <DialogDescription>{nonOpenerCount} subscriber{nonOpenerCount !== 1 ? "s" : ""} didn&apos;t open this campaign.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>New Subject Line</Label>
+              <Input value={resendSubject} onChange={(e) => setResendSubject(e.target.value)} placeholder="Try a different subject..." />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResendOpen(null)}>Cancel</Button>
+            <Button onClick={handleResend} disabled={loading || nonOpenerCount === 0 || !resendSubject.trim()}>
+              {loading ? "Sending..." : `Re-send to ${nonOpenerCount}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
