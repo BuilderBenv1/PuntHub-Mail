@@ -145,7 +145,7 @@ export function CampaignEditor({
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid gap-6 lg:grid-cols-2 max-w-full overflow-hidden">
       <div className="space-y-6">
         <Card>
           <CardHeader><CardTitle>Campaign Details</CardTitle></CardHeader>
@@ -158,7 +158,7 @@ export function CampaignEditor({
               <Label>Preview Text</Label>
               <Input value={previewText} onChange={(e) => setPreviewText(e.target.value)} placeholder="Shows in email client preview" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>From Name</Label>
                 <Input value={fromName} onChange={(e) => setFromName(e.target.value)} />
@@ -208,7 +208,7 @@ export function CampaignEditor({
               <CardTitle>HTML Body</CardTitle>
               {templates.length > 0 && (
                 <Select onValueChange={handleLoadTemplate}>
-                  <SelectTrigger className="w-48">
+                  <SelectTrigger className="w-full sm:w-48">
                     <SelectValue placeholder="Load template..." />
                   </SelectTrigger>
                   <SelectContent>

@@ -7,7 +7,7 @@ export default async function TemplatesPage() {
   const templates = await getTemplates();
   return (
     <div>
-      <h1 className="mb-6 text-3xl font-bold">Email Templates</h1>
+      <h1 className="mb-4 sm:mb-6 text-2xl sm:text-3xl font-bold">Email Templates</h1>
       <TemplatesClient initialTemplates={templates} />
     </div>
   );

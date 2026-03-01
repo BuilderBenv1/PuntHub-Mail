@@ -8,7 +8,7 @@ export default async function ApiKeysPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-3xl font-bold">API Keys</h1>
+      <h1 className="mb-4 sm:mb-6 text-2xl sm:text-3xl font-bold">API Keys</h1>
       <ApiKeysClient initialKeys={keys} />
     </div>
   );

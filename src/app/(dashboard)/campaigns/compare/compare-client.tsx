@@ -26,16 +26,16 @@ export function CompareClient({ campaigns }: { campaigns: any[] }) {
       </div>
 
       {/* Selection table */}
-      <div className="rounded-lg border">
+      <div className="rounded-lg border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-[50px]"></TableHead>
               <TableHead>Subject</TableHead>
-              <TableHead>Sent</TableHead>
-              <TableHead className="text-right">Recipients</TableHead>
-              <TableHead className="text-right">Open Rate</TableHead>
-              <TableHead className="text-right">Click Rate</TableHead>
+              <TableHead className="hidden sm:table-cell">Sent</TableHead>
+              <TableHead className="hidden sm:table-cell text-right">Recipients</TableHead>
+              <TableHead className="text-right">Open %</TableHead>
+              <TableHead className="hidden md:table-cell text-right">Click %</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -44,11 +44,11 @@ export function CompareClient({ campaigns }: { campaigns: any[] }) {
                 <TableCell>
                   <input type="checkbox" checked={selected.includes(c.id)} onChange={() => toggle(c.id)} className="rounded" />
                 </TableCell>
-                <TableCell className="font-medium">{c.subject}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{c.sent_at ? new Date(c.sent_at).toLocaleDateString() : "—"}</TableCell>
-                <TableCell className="text-right">{c.total_recipients}</TableCell>
+                <TableCell className="font-medium text-sm max-w-[180px] truncate">{c.subject}</TableCell>
+                <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">{c.sent_at ? new Date(c.sent_at).toLocaleDateString() : "—"}</TableCell>
+                <TableCell className="hidden sm:table-cell text-right">{c.total_recipients}</TableCell>
                 <TableCell className="text-right">{c.openRate}%</TableCell>
-                <TableCell className="text-right">{c.clickRate}%</TableCell>
+                <TableCell className="hidden md:table-cell text-right">{c.clickRate}%</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -59,7 +59,7 @@ export function CompareClient({ campaigns }: { campaigns: any[] }) {
       {compared.length >= 2 && (
         <div>
           <h2 className="mb-4 text-xl font-semibold">Comparison</h2>
-          <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${Math.min(compared.length, 4)}, 1fr)` }}>
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
             {compared.map((c) => {
               const stats = c.campaign_stats?.[0];
               return (

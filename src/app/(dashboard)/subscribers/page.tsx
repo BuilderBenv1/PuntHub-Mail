@@ -17,7 +17,7 @@ export default async function SubscribersPage({
 
   return (
     <div>
-      <h1 className="mb-6 text-3xl font-bold">Subscribers</h1>
+      <h1 className="mb-4 sm:mb-6 text-2xl sm:text-3xl font-bold">Subscribers</h1>
       <SubscribersClient
         initialSubscribers={subscribers}
         tags={tags}

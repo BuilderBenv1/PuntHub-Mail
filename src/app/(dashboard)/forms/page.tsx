@@ -10,7 +10,7 @@ export default async function FormsPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-3xl font-bold">Signup Forms</h1>
+      <h1 className="mb-4 sm:mb-6 text-2xl sm:text-3xl font-bold">Signup Forms</h1>
       <FormsClient initialForms={forms} tags={tags} templates={templates} />
     </div>
   );

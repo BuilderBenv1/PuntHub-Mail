@@ -121,67 +121,71 @@ export function SubscribersClient({
   return (
     <div>
       {/* Filters and actions bar */}
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
-          <Input
-            placeholder="Search email or name..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            className="w-64"
-          />
-          <Button variant="outline" onClick={handleSearch}>
-            Search
-          </Button>
+      <div className="mb-4 space-y-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2 flex-1">
+            <Input
+              placeholder="Search email or name..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              className="flex-1 sm:max-w-[280px]"
+            />
+            <Button variant="outline" onClick={handleSearch}>
+              Search
+            </Button>
+          </div>
+
+          <div className="flex gap-2">
+            <Select
+              value={currentTag || "all"}
+              onValueChange={(v) => updateFilters("tag", v)}
+            >
+              <SelectTrigger className="w-full sm:w-40">
+                <SelectValue placeholder="All Lists" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Lists</SelectItem>
+                {tags.map((tag) => (
+                  <SelectItem key={tag.id} value={tag.id}>
+                    {tag.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={currentStatus || "all"}
+              onValueChange={(v) => updateFilters("status", v)}
+            >
+              <SelectTrigger className="w-full sm:w-40">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="unsubscribed">Unsubscribed</SelectItem>
+                <SelectItem value="bounced">Bounced</SelectItem>
+                <SelectItem value="complained">Complained</SelectItem>
+                <SelectItem value="dormant">Dormant</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        <Select
-          value={currentTag || "all"}
-          onValueChange={(v) => updateFilters("tag", v)}
-        >
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="All Lists" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Lists</SelectItem>
-            {tags.map((tag) => (
-              <SelectItem key={tag.id} value={tag.id}>
-                {tag.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={currentStatus || "all"}
-          onValueChange={(v) => updateFilters("status", v)}
-        >
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="All Statuses" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="unsubscribed">Unsubscribed</SelectItem>
-            <SelectItem value="bounced">Bounced</SelectItem>
-            <SelectItem value="complained">Complained</SelectItem>
-            <SelectItem value="dormant">Dormant</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <div className="ml-auto flex gap-2">
-          <Button variant="outline" onClick={() => setDormantOpen(true)}>
+        <div className="flex flex-wrap gap-2 sm:justify-end">
+          <Button variant="outline" size="sm" onClick={() => setDormantOpen(true)}>
             Dormant Tool
           </Button>
-          <Button variant="outline" onClick={handleExport}>
+          <Button variant="outline" size="sm" onClick={handleExport}>
             Export CSV
           </Button>
-          <Button variant="outline" onClick={() => setImportOpen(true)}>
+          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
             Import CSV
           </Button>
           <Dialog open={addOpen} onOpenChange={setAddOpen}>
             <DialogTrigger asChild>
-              <Button>Add Subscriber</Button>
+              <Button size="sm">Add Subscriber</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -235,16 +239,16 @@ export function SubscribersClient({
           No subscribers found.
         </div>
       ) : (
-        <div className="rounded-lg border">
+        <div className="rounded-lg border overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Email</TableHead>
-                <TableHead>Name</TableHead>
+                <TableHead className="hidden sm:table-cell">Name</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Lists</TableHead>
-                <TableHead>Last Opened</TableHead>
-                <TableHead>Subscribed</TableHead>
+                <TableHead className="hidden md:table-cell">Lists</TableHead>
+                <TableHead className="hidden lg:table-cell">Last Opened</TableHead>
+                <TableHead className="hidden lg:table-cell">Subscribed</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -254,14 +258,14 @@ export function SubscribersClient({
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => setSelectedId(sub.id)}
                 >
-                  <TableCell className="font-medium">{sub.email}</TableCell>
-                  <TableCell>{sub.name || "—"}</TableCell>
+                  <TableCell className="font-medium text-sm max-w-[180px] truncate">{sub.email}</TableCell>
+                  <TableCell className="hidden sm:table-cell">{sub.name || "—"}</TableCell>
                   <TableCell>
                     <Badge variant={statusColors[sub.status] as any}>
                       {sub.status}
                     </Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden md:table-cell">
                     <div className="flex flex-wrap gap-1">
                       {sub.tags.map((tag) => (
                         <Badge key={tag.id} variant="outline" className="text-xs">
@@ -270,12 +274,12 @@ export function SubscribersClient({
                       ))}
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
                     {sub.last_opened_at
                       ? new Date(sub.last_opened_at).toLocaleDateString()
                       : "Never"}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
                     {new Date(sub.subscribed_at).toLocaleDateString()}
                   </TableCell>
                 </TableRow>

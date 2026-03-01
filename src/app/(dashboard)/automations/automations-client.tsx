@@ -111,16 +111,16 @@ export function AutomationsClient({
           No automations yet. Create one to get started.
         </div>
       ) : (
-        <div className="rounded-lg border">
+        <div className="rounded-lg border overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Trigger</TableHead>
-                <TableHead>List</TableHead>
+                <TableHead className="hidden sm:table-cell">Trigger</TableHead>
+                <TableHead className="hidden md:table-cell">List</TableHead>
                 <TableHead className="text-center">Steps</TableHead>
                 <TableHead className="text-center">Active</TableHead>
-                <TableHead className="w-[180px]">Actions</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -131,10 +131,10 @@ export function AutomationsClient({
                       {a.name}
                     </Link>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden sm:table-cell">
                     <Badge variant="secondary">{triggerLabel(a.trigger_type)}</Badge>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                     {a.triggerTagName || "—"}
                   </TableCell>
                   <TableCell className="text-center">{a.stepCount}</TableCell>

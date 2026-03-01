@@ -39,14 +39,14 @@ export default async function CampaignStatsPage({
 
   return (
     <div>
-      <div className="mb-6 flex items-center gap-4">
+      <div className="mb-4 sm:mb-6 flex items-start sm:items-center gap-3">
         <Link href="/campaigns">
           <Button variant="outline" size="sm">
             &larr; Back
           </Button>
         </Link>
-        <div>
-          <h1 className="text-3xl font-bold">{campaign.subject}</h1>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl sm:text-3xl font-bold truncate">{campaign.subject}</h1>
           <p className="text-sm text-muted-foreground">
             Sent {campaign.sent_at ? new Date(campaign.sent_at).toLocaleString() : "—"}{" "}
             &middot;{" "}
@@ -56,7 +56,7 @@ export default async function CampaignStatsPage({
       </div>
 
       {/* Stats cards */}
-      <div className="mb-8 grid gap-4 md:grid-cols-5">
+      <div className="mb-6 sm:mb-8 grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
         {headerStats.map((stat) => (
           <Card key={stat.label}>
             <CardHeader className="pb-2">
@@ -76,45 +76,45 @@ export default async function CampaignStatsPage({
           No send events recorded.
         </div>
       ) : (
-        <div className="rounded-lg border">
+        <div className="rounded-lg border overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Email</TableHead>
-                <TableHead>Sent</TableHead>
+                <TableHead className="hidden sm:table-cell">Sent</TableHead>
                 <TableHead>Opened</TableHead>
-                <TableHead>Clicked</TableHead>
-                <TableHead>Bounced</TableHead>
-                <TableHead>Complained</TableHead>
+                <TableHead className="hidden md:table-cell">Clicked</TableHead>
+                <TableHead className="hidden lg:table-cell">Bounced</TableHead>
+                <TableHead className="hidden lg:table-cell">Complained</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sendEvents.map((event: any) => (
                 <TableRow key={event.id}>
-                  <TableCell className="font-medium">
+                  <TableCell className="font-medium text-sm max-w-[150px] truncate">
                     {event.subscribers?.email || "—"}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
+                  <TableCell className="hidden sm:table-cell text-sm text-muted-foreground whitespace-nowrap">
                     {event.sent_at
                       ? new Date(event.sent_at).toLocaleString()
                       : "—"}
                   </TableCell>
-                  <TableCell className="text-sm">
+                  <TableCell className="text-sm whitespace-nowrap">
                     {event.opened_at
                       ? new Date(event.opened_at).toLocaleString()
                       : "—"}
                   </TableCell>
-                  <TableCell className="text-sm">
+                  <TableCell className="hidden md:table-cell text-sm whitespace-nowrap">
                     {event.clicked_at
                       ? new Date(event.clicked_at).toLocaleString()
                       : "—"}
                   </TableCell>
-                  <TableCell className="text-sm">
+                  <TableCell className="hidden lg:table-cell text-sm whitespace-nowrap">
                     {event.bounced_at
                       ? new Date(event.bounced_at).toLocaleString()
                       : "—"}
                   </TableCell>
-                  <TableCell className="text-sm">
+                  <TableCell className="hidden lg:table-cell text-sm whitespace-nowrap">
                     {event.complained_at
                       ? new Date(event.complained_at).toLocaleString()
                       : "—"}

@@ -86,35 +86,35 @@ export function CampaignsClient({ campaigns }: { campaigns: any[] }) {
       {campaigns.length === 0 ? (
         <div className="rounded-lg border p-8 text-center text-muted-foreground">No campaigns yet.</div>
       ) : (
-        <div className="rounded-lg border">
+        <div className="rounded-lg border overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Subject</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Sent Date</TableHead>
-                <TableHead className="text-right">Recipients</TableHead>
-                <TableHead className="text-right">Open Rate</TableHead>
-                <TableHead className="text-right">Click Rate</TableHead>
-                <TableHead className="w-[260px]">Actions</TableHead>
+                <TableHead className="hidden sm:table-cell">Sent Date</TableHead>
+                <TableHead className="hidden md:table-cell text-right">Recipients</TableHead>
+                <TableHead className="hidden md:table-cell text-right">Open Rate</TableHead>
+                <TableHead className="hidden lg:table-cell text-right">Click Rate</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {campaigns.map((c) => (
                 <TableRow key={c.id}>
-                  <TableCell>
-                    <Link href={c.status === "sent" ? `/campaigns/${c.id}` : `/campaigns/new?id=${c.id}`} className="font-medium hover:underline">{c.subject}</Link>
+                  <TableCell className="max-w-[200px]">
+                    <Link href={c.status === "sent" ? `/campaigns/${c.id}` : `/campaigns/new?id=${c.id}`} className="font-medium hover:underline text-sm truncate block">{c.subject}</Link>
                   </TableCell>
                   <TableCell>
                     <Badge variant={statusVariant[c.status] || "secondary"}>{c.status}</Badge>
                     {c.status === "scheduled" && c.scheduled_at && (
-                      <span className="ml-2 text-xs text-muted-foreground">{new Date(c.scheduled_at).toLocaleString()}</span>
+                      <span className="ml-2 text-xs text-muted-foreground hidden sm:inline">{new Date(c.scheduled_at).toLocaleString()}</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{c.sent_at ? new Date(c.sent_at).toLocaleDateString() : "—"}</TableCell>
-                  <TableCell className="text-right">{c.total_recipients}</TableCell>
-                  <TableCell className="text-right">{c.openRate}%</TableCell>
-                  <TableCell className="text-right">{c.clickRate}%</TableCell>
+                  <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">{c.sent_at ? new Date(c.sent_at).toLocaleDateString() : "—"}</TableCell>
+                  <TableCell className="hidden md:table-cell text-right">{c.total_recipients}</TableCell>
+                  <TableCell className="hidden md:table-cell text-right">{c.openRate}%</TableCell>
+                  <TableCell className="hidden lg:table-cell text-right">{c.clickRate}%</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
                       {c.status === "draft" && <Link href={`/campaigns/new?id=${c.id}`}><Button size="sm" variant="outline">Edit</Button></Link>}

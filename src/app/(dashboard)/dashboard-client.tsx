@@ -114,15 +114,15 @@ export default function DashboardClient({
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-bold">Dashboard</h1>
+      <h1 className="text-2xl sm:text-3xl font-bold">Dashboard</h1>
 
       {/* Stat Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
         {statCards.map((stat) => (
           <Card key={stat.title}>
             <CardHeader className="pb-2">
               <CardDescription>{stat.description}</CardDescription>
-              <CardTitle className="text-3xl">{stat.value}</CardTitle>
+              <CardTitle className="text-xl sm:text-3xl">{stat.value}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">{stat.title}</p>
@@ -219,42 +219,44 @@ export default function DashboardClient({
           {campaignPerformance.length === 0 ? (
             <p className="text-sm text-muted-foreground">No campaigns sent yet.</p>
           ) : (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Subject</TableHead>
-                  <TableHead>Sent</TableHead>
+                  <TableHead className="hidden sm:table-cell">Sent</TableHead>
                   <TableHead className="text-right">Recipients</TableHead>
-                  <TableHead className="text-right">Opens</TableHead>
-                  <TableHead className="text-right">Open Rate</TableHead>
-                  <TableHead className="text-right">Clicks</TableHead>
-                  <TableHead className="text-right">Click Rate</TableHead>
+                  <TableHead className="hidden sm:table-cell text-right">Opens</TableHead>
+                  <TableHead className="text-right">Open %</TableHead>
+                  <TableHead className="hidden md:table-cell text-right">Clicks</TableHead>
+                  <TableHead className="hidden md:table-cell text-right">Click %</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {campaignPerformance.map((campaign) => (
                   <TableRow key={campaign.id}>
-                    <TableCell className="font-medium max-w-[250px] truncate">
+                    <TableCell className="font-medium max-w-[150px] sm:max-w-[250px] truncate text-sm">
                       {campaign.subject}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap">
+                    <TableCell className="hidden sm:table-cell whitespace-nowrap">
                       {formatDate(campaign.sentAt)}
                     </TableCell>
                     <TableCell className="text-right">
                       {formatNumber(campaign.totalRecipients)}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="hidden sm:table-cell text-right">
                       {formatNumber(campaign.opened)}
                     </TableCell>
                     <TableCell className="text-right">{campaign.openRate}%</TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="hidden md:table-cell text-right">
                       {formatNumber(campaign.clicked)}
                     </TableCell>
-                    <TableCell className="text-right">{campaign.clickRate}%</TableCell>
+                    <TableCell className="hidden md:table-cell text-right">{campaign.clickRate}%</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>

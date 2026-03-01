@@ -148,14 +148,14 @@ export function TagsClient({ initialTags }: { initialTags: Tag[] }) {
           No lists yet. Create your first list to get started.
         </div>
       ) : (
-        <div className="rounded-lg border">
+        <div className="rounded-lg border overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="text-right">Active Subscribers</TableHead>
-                <TableHead className="w-[200px]">Actions</TableHead>
+                <TableHead className="hidden sm:table-cell">Description</TableHead>
+                <TableHead className="text-right">Subscribers</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -177,7 +177,7 @@ export function TagsClient({ initialTags }: { initialTags: Tag[] }) {
                       </Link>
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="hidden sm:table-cell">
                     {editingId === tag.id ? (
                       <Input
                         value={editDesc}

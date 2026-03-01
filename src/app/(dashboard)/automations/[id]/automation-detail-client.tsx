@@ -163,7 +163,7 @@ export function AutomationDetailClient({
               &larr; Back to Automations
             </Button>
           </Link>
-          <h1 className="text-3xl font-bold">{automation.name}</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">{automation.name}</h1>
           <div className="mt-2 flex items-center gap-2">
             <Badge variant="secondary">{triggerLabel(automation.trigger_type)}</Badge>
             {automation.tags?.name && (
