@@ -80,7 +80,7 @@ export async function getRecentCampaignPerformance() {
 
   const { data } = await supabase
     .from("campaigns")
-    .select("id, subject, sent_at, total_recipients, campaign_stats(*)")
+    .select("id, subject, sent_at, total_recipients, campaign_stats(opened, clicked, bounced, complained, unsubscribed)")
     .eq("status", "sent")
     .order("sent_at", { ascending: false })
     .limit(10);
