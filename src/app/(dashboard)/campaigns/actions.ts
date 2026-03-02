@@ -12,7 +12,7 @@ export async function getCampaigns() {
 
   const { data, error } = await supabase
     .from("campaigns")
-    .select("id, subject, preview_text, from_name, from_email, reply_to, tag_ids, exclude_tag_ids, status, total_recipients, sent_at, scheduled_for, created_at, campaign_stats(opened, clicked, bounced, complained, unsubscribed)")
+    .select("id, subject, preview_text, from_name, from_email, reply_to, tag_ids, exclude_tag_ids, status, total_recipients, sent_at, scheduled_at, created_at, campaign_stats(opened, clicked, bounced, complained, unsubscribed)")
     .order("created_at", { ascending: false });
 
   if (error) throw error;
@@ -33,7 +33,7 @@ export async function getCampaign(id: string) {
 
   const { data } = await supabase
     .from("campaigns")
-    .select("id, subject, preview_text, html_body, from_name, from_email, reply_to, tag_ids, exclude_tag_ids, status, total_recipients, sent_at, scheduled_for, created_at, campaign_stats(opened, clicked, bounced, complained, unsubscribed)")
+    .select("id, subject, preview_text, html_body, from_name, from_email, reply_to, tag_ids, exclude_tag_ids, status, total_recipients, sent_at, scheduled_at, created_at, campaign_stats(opened, clicked, bounced, complained, unsubscribed)")
     .eq("id", id)
     .single();
 
