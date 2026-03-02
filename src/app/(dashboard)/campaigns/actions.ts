@@ -12,7 +12,7 @@ export async function getCampaigns() {
 
   const { data, error } = await supabase
     .from("campaigns")
-    .select("*, campaign_stats(*)")
+    .select("id, subject, preview_text, from_name, from_email, reply_to, tag_ids, exclude_tag_ids, status, total_recipients, sent_at, scheduled_for, created_at, campaign_stats(*)")
     .order("created_at", { ascending: false });
 
   if (error) throw error;

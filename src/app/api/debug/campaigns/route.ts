@@ -20,13 +20,18 @@ export async function GET() {
       .select("*, campaign_stats(*)")
       .order("created_at", { ascending: false });
 
-    // Test 3: Exact getRecentCampaignPerformance query
+    // Test 3: Join with specific stats columns
     const { data: perf, error: e3 } = await supabase
       .from("campaigns")
-      .select("id, subject, sent_at, total_recipients, campaign_stats(*)")
+      .select("id, subject, sent_at, total_recipients, campaign_stats(opened, clicked, bounced)")
       .eq("status", "sent")
       .order("sent_at", { ascending: false })
       .limit(10);
+
+    // Test 4: No join, fetch stats separately
+    const { data: allStats, error: e4 } = await supabase
+      .from("campaign_stats")
+      .select("campaign_id, opened, clicked, bounced");
 
     return NextResponse.json({
       env_check: {
@@ -37,6 +42,7 @@ export async function GET() {
       simple: { error: e1?.message, count: simple?.length, data: simple },
       full: { error: e2?.message, count: full?.length, ids: full?.map((c: any) => c.id) },
       perf: { error: e3?.message, count: perf?.length, data: perf },
+      stats_separate: { error: e4?.message, count: allStats?.length, data: allStats },
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
