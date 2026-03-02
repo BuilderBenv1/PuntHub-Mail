@@ -23,10 +23,28 @@ export async function getSubscribers(params: {
 }) {
   const supabase = createServiceClient();
 
+  // If filtering by tag, first get subscriber IDs from subscriber_tags
+  let tagSubscriberIds: string[] | null = null;
+  if (params.tag) {
+    const { data: tagLinks } = await supabase
+      .from("subscriber_tags")
+      .select("subscriber_id")
+      .eq("tag_id", params.tag);
+    tagSubscriberIds = (tagLinks || []).map((t: any) => t.subscriber_id);
+    if (tagSubscriberIds.length === 0) {
+      return [];
+    }
+  }
+
   let query = supabase
     .from("subscribers")
     .select("*, subscriber_tags(tag_id, tags(id, name))")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(5000);
+
+  if (tagSubscriberIds) {
+    query = query.in("id", tagSubscriberIds);
+  }
 
   if (params.search) {
     query = query.or(
@@ -42,7 +60,7 @@ export async function getSubscribers(params: {
   if (error) throw error;
 
   // Flatten tags
-  let subscribers: SubscriberWithTags[] = (data || []).map((sub: any) => ({
+  const subscribers: SubscriberWithTags[] = (data || []).map((sub: any) => ({
     id: sub.id,
     email: sub.email,
     name: sub.name,
@@ -56,13 +74,6 @@ export async function getSubscribers(params: {
       .map((st: any) => st.tags)
       .filter(Boolean),
   }));
-
-  // Filter by tag if specified
-  if (params.tag) {
-    subscribers = subscribers.filter((sub) =>
-      sub.tags.some((t) => t.id === params.tag)
-    );
-  }
 
   return subscribers;
 }
