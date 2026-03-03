@@ -455,7 +455,6 @@ export async function resendToNonOpeners(campaignId: string, newSubject: string)
       .replace(/\{unsubscribe_token\}/g, recipient.unsubscribe_token)
       .replace(/\{subscriber_id\}/g, recipient.id);
 
-    let sent = false;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const { data: emailResult, error: sendError } = await resend.emails.send({
@@ -483,7 +482,6 @@ export async function resendToNonOpeners(campaignId: string, newSubject: string)
           sent_at: new Date().toISOString(),
         });
         totalSent++;
-        sent = true;
         break;
       } catch (err: any) {
         console.error(`Failed to resend to ${recipient.email}:`, err.message);
