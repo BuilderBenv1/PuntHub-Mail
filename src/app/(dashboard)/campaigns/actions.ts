@@ -228,20 +228,20 @@ export async function sendCampaignNow(campaignId: string) {
   // Rewrite links for click tracking
   const trackedHtml = await rewriteLinksForTracking(campaign.html_body, campaignId, null, supabase);
 
-  // Send in batches of 100 with 500ms delay
+  // Send emails one at a time with rate limiting and retry on 429
   let totalSent = 0;
+  const MAX_RETRIES = 3;
 
-  for (let i = 0; i < recipients.length; i += 100) {
-    const batch = recipients.slice(i, i + 100);
+  for (let idx = 0; idx < recipients.length; idx++) {
+    const recipient = recipients[idx];
+    const html = trackedHtml
+      .replace(/\{unsubscribe_token\}/g, recipient.unsubscribe_token)
+      .replace(/\{subscriber_id\}/g, recipient.id);
 
-    for (const recipient of batch) {
-      // Replace unsubscribe token and subscriber_id placeholders in HTML
-      const html = trackedHtml
-        .replace(/\{unsubscribe_token\}/g, recipient.unsubscribe_token)
-        .replace(/\{subscriber_id\}/g, recipient.id);
-
+    let sent = false;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
-        const { data: emailResult } = await resend.emails.send({
+        const { data: emailResult, error: sendError } = await resend.emails.send({
           from: `${campaign.from_name} <${campaign.from_email}>`,
           to: recipient.email,
           subject: campaign.subject,
@@ -252,7 +252,19 @@ export async function sendCampaignNow(campaignId: string) {
             : undefined,
         });
 
-        // Create send_event
+        if (sendError) {
+          const msg = sendError.message || "";
+          if (msg.toLowerCase().includes("rate") || msg.includes("429")) {
+            const wait = Math.pow(2, attempt) * 1000;
+            console.log(`Rate limited on ${recipient.email}, waiting ${wait}ms (attempt ${attempt + 1})`);
+            await sleep(wait);
+            continue;
+          }
+          console.error(`Failed to send to ${recipient.email}:`, msg);
+          break;
+        }
+
+        // Only record send event on success
         await supabase.from("send_events").insert({
           campaign_id: campaignId,
           subscriber_id: recipient.id,
@@ -261,14 +273,21 @@ export async function sendCampaignNow(campaignId: string) {
         });
 
         totalSent++;
+        sent = true;
+        break;
       } catch (err: any) {
         console.error(`Failed to send to ${recipient.email}:`, err.message);
+        break;
       }
     }
 
-    // 500ms delay between batches
-    if (i + 100 < recipients.length) {
-      await sleep(500);
+    if (!sent) {
+      console.error(`Gave up on ${recipient.email} after retries`);
+    }
+
+    // 600ms between each email to stay under Resend's 2/sec rate limit
+    if (idx + 1 < recipients.length) {
+      await sleep(600);
     }
   }
 
@@ -430,20 +449,33 @@ export async function resendToNonOpeners(campaignId: string, newSubject: string)
 
   let totalSent = 0;
 
-  for (let i = 0; i < activeNonOpeners.length; i += 100) {
-    const batch = activeNonOpeners.slice(i, i + 100);
-    for (const recipient of batch) {
-      const html = trackedHtml
-        .replace(/\{unsubscribe_token\}/g, recipient.unsubscribe_token)
-        .replace(/\{subscriber_id\}/g, recipient.id);
+  for (let idx = 0; idx < activeNonOpeners.length; idx++) {
+    const recipient = activeNonOpeners[idx];
+    const html = trackedHtml
+      .replace(/\{unsubscribe_token\}/g, recipient.unsubscribe_token)
+      .replace(/\{subscriber_id\}/g, recipient.id);
+
+    let sent = false;
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const { data: emailResult } = await resend.emails.send({
+        const { data: emailResult, error: sendError } = await resend.emails.send({
           from: `${campaign.from_name} <${campaign.from_email}>`,
           to: recipient.email,
           subject: newSubject,
           html,
           replyTo: campaign.reply_to || undefined,
         });
+
+        if (sendError) {
+          const msg = sendError.message || "";
+          if (msg.toLowerCase().includes("rate") || msg.includes("429")) {
+            await sleep(Math.pow(2, attempt) * 1000);
+            continue;
+          }
+          console.error(`Failed to resend to ${recipient.email}:`, msg);
+          break;
+        }
+
         await supabase.from("send_events").insert({
           campaign_id: newCampaign.id,
           subscriber_id: recipient.id,
@@ -451,11 +483,15 @@ export async function resendToNonOpeners(campaignId: string, newSubject: string)
           sent_at: new Date().toISOString(),
         });
         totalSent++;
+        sent = true;
+        break;
       } catch (err: any) {
         console.error(`Failed to resend to ${recipient.email}:`, err.message);
+        break;
       }
     }
-    if (i + 100 < activeNonOpeners.length) await sleep(500);
+
+    if (idx + 1 < activeNonOpeners.length) await sleep(600);
   }
 
   await supabase.from("campaigns").update({ total_recipients: totalSent }).eq("id", newCampaign.id);

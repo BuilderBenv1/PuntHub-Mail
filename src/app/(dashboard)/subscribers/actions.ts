@@ -112,6 +112,8 @@ export async function addSubscriber(formData: FormData) {
   const name = (formData.get("name") as string) || null;
   const tagIds = formData.getAll("tags") as string[];
 
+  let subscriberId: string;
+
   const { data: subscriber, error } = await supabase
     .from("subscribers")
     .insert({ email, name })
@@ -120,18 +122,32 @@ export async function addSubscriber(formData: FormData) {
 
   if (error) {
     if (error.code === "23505") {
-      return { error: "A subscriber with this email already exists." };
+      // Subscriber exists - find them and add the tags
+      const { data: existing } = await supabase
+        .from("subscribers")
+        .select("id")
+        .eq("email", email)
+        .single();
+
+      if (!existing) return { error: "Subscriber exists but could not be found." };
+      subscriberId = existing.id;
+    } else {
+      return { error: error.message };
     }
-    return { error: error.message };
+  } else {
+    subscriberId = subscriber.id;
   }
 
-  // Assign tags
+  // Assign tags (skip duplicates)
   if (tagIds.length > 0) {
     const tagInserts = tagIds.map((tag_id) => ({
-      subscriber_id: subscriber.id,
+      subscriber_id: subscriberId,
       tag_id,
     }));
-    await supabase.from("subscriber_tags").insert(tagInserts);
+    await supabase.from("subscriber_tags").upsert(tagInserts, {
+      onConflict: "subscriber_id,tag_id",
+      ignoreDuplicates: true,
+    });
   }
 
   revalidatePath("/subscribers");
