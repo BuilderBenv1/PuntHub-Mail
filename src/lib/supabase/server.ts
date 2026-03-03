@@ -23,6 +23,11 @@ export async function createClient() {
           }
         },
       },
+      global: {
+        fetch: (url, options = {}) => {
+          return fetch(url, { ...options, cache: "no-store" });
+        },
+      },
     }
   );
 }
@@ -37,6 +42,11 @@ export function createServiceClient() {
           return [];
         },
         setAll() {},
+      },
+      global: {
+        fetch: (url, options = {}) => {
+          return fetch(url, { ...options, cache: "no-store" });
+        },
       },
     }
   );
