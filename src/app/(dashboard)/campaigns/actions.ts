@@ -33,7 +33,7 @@ export async function getCampaign(id: string) {
 
   const { data } = await supabase
     .from("campaigns")
-    .select("id, subject, preview_text, html_body, from_name, from_email, reply_to, tag_ids, exclude_tag_ids, status, total_recipients, sent_at, scheduled_at, created_at, campaign_stats(opened, clicked, bounced, complained, unsubscribed)")
+    .select("id, subject, preview_text, html_body, design_json, from_name, from_email, reply_to, tag_ids, exclude_tag_ids, status, total_recipients, sent_at, scheduled_at, created_at, campaign_stats(opened, clicked, bounced, complained, unsubscribed)")
     .eq("id", id)
     .single();
 
@@ -98,6 +98,7 @@ export async function saveDraft(formData: FormData) {
   const from_email = (formData.get("from_email") as string) || "news@punthub.co.uk";
   const reply_to = (formData.get("reply_to") as string) || null;
   const html_body = formData.get("html_body") as string;
+  const design_json = JSON.parse((formData.get("design_json") as string) || "null");
   const tag_ids = JSON.parse((formData.get("tag_ids") as string) || "[]");
   const exclude_tag_ids = JSON.parse((formData.get("exclude_tag_ids") as string) || "[]");
 
@@ -108,6 +109,7 @@ export async function saveDraft(formData: FormData) {
     from_email,
     reply_to,
     html_body,
+    design_json,
     tag_ids,
     exclude_tag_ids,
     status: "draft",

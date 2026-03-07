@@ -28,11 +28,12 @@ export async function saveTemplate(formData: FormData) {
   const name = formData.get("name") as string;
   const subject = (formData.get("subject") as string) || null;
   const html_body = formData.get("html_body") as string;
+  const design_json = JSON.parse((formData.get("design_json") as string) || "null");
 
   if (id) {
     const { error } = await supabase
       .from("email_templates")
-      .update({ name, subject, html_body, updated_at: new Date().toISOString() })
+      .update({ name, subject, html_body, design_json, updated_at: new Date().toISOString() })
       .eq("id", id);
     if (error) return { error: error.message };
     revalidatePath("/templates");
@@ -40,7 +41,7 @@ export async function saveTemplate(formData: FormData) {
   } else {
     const { data, error } = await supabase
       .from("email_templates")
-      .insert({ name, subject, html_body })
+      .insert({ name, subject, html_body, design_json })
       .select()
       .single();
     if (error) return { error: error.message };
