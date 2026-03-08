@@ -25,6 +25,12 @@ export async function createForm(formData: FormData) {
   const redirect_url = (formData.get("redirect_url") as string) || null;
   const welcome_template_id = (formData.get("welcome_template_id") as string) || null;
 
+  const theme = (formData.get("theme") as string) || "clean";
+  const accent_color = (formData.get("accent_color") as string) || null;
+  const background_color = (formData.get("background_color") as string) || null;
+  const logo_url = (formData.get("logo_url") as string) || null;
+  const show_name_field = formData.get("show_name_field") !== "false";
+
   const { error } = await supabase.from("signup_forms").insert({
     name,
     slug,
@@ -35,6 +41,11 @@ export async function createForm(formData: FormData) {
     tag_ids,
     redirect_url,
     welcome_template_id,
+    theme,
+    accent_color,
+    background_color,
+    logo_url,
+    show_name_field,
   });
 
   if (error) {
@@ -60,9 +71,15 @@ export async function updateForm(id: string, formData: FormData) {
   const active = formData.get("active") === "true";
   const welcome_template_id = (formData.get("welcome_template_id") as string) || null;
 
+  const theme = (formData.get("theme") as string) || "clean";
+  const accent_color = (formData.get("accent_color") as string) || null;
+  const background_color = (formData.get("background_color") as string) || null;
+  const logo_url = (formData.get("logo_url") as string) || null;
+  const show_name_field = formData.get("show_name_field") !== "false";
+
   const { error } = await supabase
     .from("signup_forms")
-    .update({ name, slug, heading, description, button_text, success_message, tag_ids, redirect_url, active, welcome_template_id })
+    .update({ name, slug, heading, description, button_text, success_message, tag_ids, redirect_url, active, welcome_template_id, theme, accent_color, background_color, logo_url, show_name_field })
     .eq("id", id);
 
   if (error) return { error: error.message };

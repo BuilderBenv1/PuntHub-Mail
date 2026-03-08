@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { createServiceClient } from "@/lib/supabase/server";
 import { SignupFormPage } from "./signup-form";
+import { getTheme, applyCustomColors } from "@/app/(dashboard)/forms/themes";
 
 export default async function PublicSignupPage({
   params,
@@ -25,5 +26,11 @@ export default async function PublicSignupPage({
     );
   }
 
-  return <SignupFormPage form={form} />;
+  const baseTheme = getTheme(form.theme);
+  const theme = applyCustomColors(baseTheme, {
+    accentColor: form.accent_color,
+    backgroundColor: form.background_color,
+  });
+
+  return <SignupFormPage form={form} theme={theme} />;
 }

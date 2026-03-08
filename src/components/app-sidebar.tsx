@@ -26,6 +26,7 @@ const navItems = [
   { title: "Automations", href: "/automations", icon: "⚡" },
   { title: "Templates", href: "/templates", icon: "📄" },
   { title: "Forms", href: "/forms", icon: "📝" },
+  { title: "Landing Pages", href: "/landing-pages", icon: "🌐" },
   { title: "API Keys", href: "/api-keys", icon: "🔑" },
 ];
 
