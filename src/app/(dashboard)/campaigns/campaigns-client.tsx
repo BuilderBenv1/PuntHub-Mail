@@ -101,7 +101,10 @@ export function CampaignsClient({ campaigns }: { campaigns: any[] }) {
             </TableHeader>
             <TableBody>
               {campaigns.map((c) => (
-                <TableRow key={c.id}>
+                <TableRow key={c.id} className="cursor-pointer" onClick={() => {
+                    if (c.status === "sent" || c.status === "sending") router.push(`/campaigns/${c.id}`);
+                    else router.push(`/campaigns/new?id=${c.id}`);
+                  }}>
                   <TableCell className="max-w-[200px]">
                     <Link href={c.status === "sent" ? `/campaigns/${c.id}` : `/campaigns/new?id=${c.id}`} className="font-medium hover:underline text-sm truncate block">{c.subject}</Link>
                   </TableCell>

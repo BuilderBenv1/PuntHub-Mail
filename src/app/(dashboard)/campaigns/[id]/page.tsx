@@ -69,6 +69,74 @@ export default async function CampaignStatsPage({
         ))}
       </div>
 
+      {/* Email details */}
+      <div className="mb-6 sm:mb-8 grid gap-4 sm:grid-cols-2">
+        <Card>
+          <CardHeader><CardTitle className="text-base">Campaign Details</CardTitle></CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">From</span>
+              <span>{campaign.from_name} &lt;{campaign.from_email}&gt;</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Subject</span>
+              <span className="text-right max-w-[60%] truncate">{campaign.subject}</span>
+            </div>
+            {campaign.preview_text && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Preview Text</span>
+                <span className="text-right max-w-[60%] truncate">{campaign.preview_text}</span>
+              </div>
+            )}
+            {campaign.reply_to && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Reply-To</span>
+                <span>{campaign.reply_to}</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="text-base">Engagement</CardTitle></CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Unique Opens</span>
+              <span>{stats?.opened ?? 0}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Unique Clicks</span>
+              <span>{stats?.clicked ?? 0}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Bounces</span>
+              <span>{stats?.bounced ?? 0}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Complaints</span>
+              <span>{stats?.complained ?? 0}</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Email preview */}
+      {campaign.html_body && (
+        <div className="mb-6 sm:mb-8">
+          <h2 className="mb-4 text-xl font-semibold">Email Preview</h2>
+          <Card>
+            <CardContent className="p-0">
+              <iframe
+                srcDoc={campaign.html_body}
+                className="w-full border-0 rounded-lg"
+                style={{ minHeight: "500px" }}
+                title="Email preview"
+                sandbox=""
+              />
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Send events table */}
       <h2 className="mb-4 text-xl font-semibold">Individual Send Events</h2>
       {sendEvents.length === 0 ? (
