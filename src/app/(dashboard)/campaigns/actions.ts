@@ -79,13 +79,20 @@ export async function getRecipientCount(
 
   if (finalIds.length === 0) return 0;
 
-  const { count } = await supabase
-    .from("subscribers")
-    .select("*", { count: "exact", head: true })
-    .in("id", finalIds)
-    .eq("status", "active");
+  // Process in chunks to avoid Supabase .in() URL length limits with large lists
+  let totalCount = 0;
+  const chunkSize = 500;
+  for (let i = 0; i < finalIds.length; i += chunkSize) {
+    const chunk = finalIds.slice(i, i + chunkSize);
+    const { count } = await supabase
+      .from("subscribers")
+      .select("*", { count: "exact", head: true })
+      .in("id", chunk)
+      .eq("status", "active");
+    totalCount += count ?? 0;
+  }
 
-  return count ?? 0;
+  return totalCount;
 }
 
 export async function saveDraft(formData: FormData) {
@@ -188,13 +195,20 @@ async function getRecipients(includeTagIds: string[], excludeTagIds: string[]) {
   const finalIds = includedIds.filter((id) => !excludedIds.includes(id));
   if (finalIds.length === 0) return [];
 
-  const { data: subscribers } = await supabase
-    .from("subscribers")
-    .select("id, email, unsubscribe_token")
-    .in("id", finalIds)
-    .eq("status", "active");
+  // Process in chunks to avoid Supabase .in() URL length limits with large lists
+  const allSubscribers: any[] = [];
+  const chunkSize = 500;
+  for (let i = 0; i < finalIds.length; i += chunkSize) {
+    const chunk = finalIds.slice(i, i + chunkSize);
+    const { data: subscribers } = await supabase
+      .from("subscribers")
+      .select("id, email, unsubscribe_token")
+      .in("id", chunk)
+      .eq("status", "active");
+    if (subscribers) allSubscribers.push(...subscribers);
+  }
 
-  return subscribers || [];
+  return allSubscribers;
 }
 
 function sleep(ms: number) {
