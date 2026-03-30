@@ -7,6 +7,25 @@ import { rewriteLinksForTracking } from "@/lib/track-links";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+// Helper to fetch all rows from a query that may exceed Supabase's default 1000-row limit
+async function fetchAllSubscriberTags(supabase: any, tagIds: string[]): Promise<string[]> {
+  const allIds: string[] = [];
+  const pageSize = 1000;
+  let offset = 0;
+  while (true) {
+    const { data } = await supabase
+      .from("subscriber_tags")
+      .select("subscriber_id")
+      .in("tag_id", tagIds)
+      .range(offset, offset + pageSize - 1);
+    if (!data || data.length === 0) break;
+    allIds.push(...data.map((r: any) => r.subscriber_id));
+    if (data.length < pageSize) break;
+    offset += pageSize;
+  }
+  return Array.from(new Set(allIds));
+}
+
 export async function getCampaigns() {
   const supabase = createServiceClient();
 
@@ -54,32 +73,19 @@ export async function getRecipientCount(
 
   if (includeTagIds.length === 0) return 0;
 
-  // Get subscribers who have any of the include tags
-  const { data: included } = await supabase
-    .from("subscriber_tags")
-    .select("subscriber_id")
-    .in("tag_id", includeTagIds);
-
-  const includedIds = Array.from(new Set((included || []).map((r: any) => r.subscriber_id)));
-
+  // Fetch all subscriber IDs with pagination to avoid 1000-row default limit
+  const includedIds = await fetchAllSubscriberTags(supabase, includeTagIds);
   if (includedIds.length === 0) return 0;
 
-  // Get subscribers who have any of the exclude tags
   let excludedIds: string[] = [];
   if (excludeTagIds.length > 0) {
-    const { data: excluded } = await supabase
-      .from("subscriber_tags")
-      .select("subscriber_id")
-      .in("tag_id", excludeTagIds);
-    excludedIds = Array.from(new Set((excluded || []).map((r: any) => r.subscriber_id)));
+    excludedIds = await fetchAllSubscriberTags(supabase, excludeTagIds);
   }
 
-  // Filter: included minus excluded, only active
   const finalIds = includedIds.filter((id) => !excludedIds.includes(id));
-
   if (finalIds.length === 0) return 0;
 
-  // Process in chunks to avoid Supabase .in() URL length limits with large lists
+  // Process in chunks to avoid Supabase .in() URL length limits
   let totalCount = 0;
   const chunkSize = 500;
   for (let i = 0; i < finalIds.length; i += chunkSize) {
@@ -175,27 +181,18 @@ async function getRecipients(includeTagIds: string[], excludeTagIds: string[]) {
 
   if (includeTagIds.length === 0) return [];
 
-  const { data: included } = await supabase
-    .from("subscriber_tags")
-    .select("subscriber_id")
-    .in("tag_id", includeTagIds);
-
-  const includedIds = Array.from(new Set((included || []).map((r: any) => r.subscriber_id)));
+  const includedIds = await fetchAllSubscriberTags(supabase, includeTagIds);
   if (includedIds.length === 0) return [];
 
   let excludedIds: string[] = [];
   if (excludeTagIds.length > 0) {
-    const { data: excluded } = await supabase
-      .from("subscriber_tags")
-      .select("subscriber_id")
-      .in("tag_id", excludeTagIds);
-    excludedIds = Array.from(new Set((excluded || []).map((r: any) => r.subscriber_id)));
+    excludedIds = await fetchAllSubscriberTags(supabase, excludeTagIds);
   }
 
   const finalIds = includedIds.filter((id) => !excludedIds.includes(id));
   if (finalIds.length === 0) return [];
 
-  // Process in chunks to avoid Supabase .in() URL length limits with large lists
+  // Process in chunks to avoid Supabase .in() URL length limits
   const allSubscribers: any[] = [];
   const chunkSize = 500;
   for (let i = 0; i < finalIds.length; i += chunkSize) {
@@ -227,8 +224,9 @@ export async function sendCampaignNow(campaignId: string) {
 
   if (!campaign) return { error: "Campaign not found" };
   if (campaign.status === "sent") return { error: "Campaign already sent" };
+  if (campaign.status === "sending") return { error: "Campaign is already being sent" };
 
-  // Get recipients
+  // Get recipients to validate there are some
   const recipients = await getRecipients(
     campaign.tag_ids || [],
     campaign.exclude_tag_ids || []
@@ -241,85 +239,18 @@ export async function sendCampaignNow(campaignId: string) {
     .from("campaign_stats")
     .upsert({ campaign_id: campaignId, opened: 0, clicked: 0, bounced: 0, complained: 0, unsubscribed: 0 }, { onConflict: "campaign_id" });
 
-  // Rewrite links for click tracking
-  const trackedHtml = await rewriteLinksForTracking(campaign.html_body, campaignId, null, supabase);
-
-  // Send emails one at a time with rate limiting and retry on 429
-  let totalSent = 0;
-  const MAX_RETRIES = 3;
-
-  for (let idx = 0; idx < recipients.length; idx++) {
-    const recipient = recipients[idx];
-    const html = trackedHtml
-      .replace(/\{unsubscribe_token\}/g, recipient.unsubscribe_token)
-      .replace(/\{subscriber_id\}/g, recipient.id);
-
-    let sent = false;
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      try {
-        const { data: emailResult, error: sendError } = await resend.emails.send({
-          from: `${campaign.from_name} <${campaign.from_email}>`,
-          to: recipient.email,
-          subject: campaign.subject,
-          html,
-          replyTo: campaign.reply_to || undefined,
-          headers: campaign.preview_text
-            ? { "X-Preview-Text": campaign.preview_text }
-            : undefined,
-        });
-
-        if (sendError) {
-          const msg = sendError.message || "";
-          if (msg.toLowerCase().includes("rate") || msg.includes("429")) {
-            const wait = Math.pow(2, attempt) * 1000;
-            console.log(`Rate limited on ${recipient.email}, waiting ${wait}ms (attempt ${attempt + 1})`);
-            await sleep(wait);
-            continue;
-          }
-          console.error(`Failed to send to ${recipient.email}:`, msg);
-          break;
-        }
-
-        // Only record send event on success
-        await supabase.from("send_events").insert({
-          campaign_id: campaignId,
-          subscriber_id: recipient.id,
-          resend_email_id: emailResult?.id || null,
-          sent_at: new Date().toISOString(),
-        });
-
-        totalSent++;
-        sent = true;
-        break;
-      } catch (err: any) {
-        console.error(`Failed to send to ${recipient.email}:`, err.message);
-        break;
-      }
-    }
-
-    if (!sent) {
-      console.error(`Gave up on ${recipient.email} after retries`);
-    }
-
-    // 600ms between each email to stay under Resend's 2/sec rate limit
-    if (idx + 1 < recipients.length) {
-      await sleep(600);
-    }
-  }
-
-  // Update campaign status
+  // Mark campaign as "sending" — the cron endpoint /api/cron/send will pick it up
+  // and send in batches to avoid Vercel function timeouts
   await supabase
     .from("campaigns")
     .update({
-      status: "sent",
-      sent_at: new Date().toISOString(),
-      total_recipients: totalSent,
+      status: "sending",
+      total_recipients: recipients.length,
     })
     .eq("id", campaignId);
 
   revalidatePath("/campaigns");
-  revalidatePath(`/campaigns/${campaignId}`);
-  return { success: true, sent: totalSent };
+  return { success: true, sent: recipients.length, message: "Campaign queued — emails will be sent in batches." };
 }
 
 export async function getCampaignStats(campaignId: string) {

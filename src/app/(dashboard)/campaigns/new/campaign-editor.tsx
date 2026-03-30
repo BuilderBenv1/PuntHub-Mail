@@ -146,7 +146,7 @@ export function CampaignEditor({
     setSending(false);
     setSendConfirmOpen(false);
     if (result.error) { toast({ title: "Error", description: result.error, variant: "destructive" }); return; }
-    toast({ title: "Campaign sent", description: `${result.sent} emails sent` });
+    toast({ title: "Campaign queued", description: `Sending to ${result.sent} recipients in batches` });
     router.push("/campaigns");
   }
 
