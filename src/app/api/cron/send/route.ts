@@ -87,12 +87,20 @@ export async function GET(request: NextRequest) {
 
     const finalIds = includedIds.filter((id) => !excludedIds.includes(id));
 
-    // Find which subscribers already got this campaign
-    const { data: alreadySent } = await supabase
-      .from("send_events")
-      .select("subscriber_id")
-      .eq("campaign_id", campaign.id);
-    const alreadySentIds = new Set((alreadySent || []).map((r: any) => r.subscriber_id));
+    // Find which subscribers already got this campaign (paginated to handle >1000)
+    const alreadySentIds = new Set<string>();
+    let sentOffset = 0;
+    while (true) {
+      const { data: sentPage } = await supabase
+        .from("send_events")
+        .select("subscriber_id")
+        .eq("campaign_id", campaign.id)
+        .range(sentOffset, sentOffset + 999);
+      if (!sentPage || sentPage.length === 0) break;
+      sentPage.forEach((r: any) => alreadySentIds.add(r.subscriber_id));
+      if (sentPage.length < 1000) break;
+      sentOffset += 1000;
+    }
 
     // Get remaining subscribers who haven't been sent to yet, in chunks
     const remainingIds = finalIds.filter((id) => !alreadySentIds.has(id));
@@ -114,17 +122,58 @@ export async function GET(request: NextRequest) {
       continue;
     }
 
-    // Fetch a batch of unsent subscribers
-    const batchIds = remainingIds.slice(0, BATCH_SIZE);
+    // Fetch active subscribers from remaining pool (larger batch to skip inactive)
+    const lookAheadIds = remainingIds.slice(0, BATCH_SIZE * 10);
     const allRecipients: any[] = [];
-    for (let i = 0; i < batchIds.length; i += 500) {
-      const chunk = batchIds.slice(i, i + 500);
+    for (let i = 0; i < lookAheadIds.length; i += 500) {
+      const chunk = lookAheadIds.slice(i, i + 500);
       const { data: subs } = await supabase
         .from("subscribers")
         .select("id, email, unsubscribe_token")
         .in("id", chunk)
         .eq("status", "active");
       if (subs) allRecipients.push(...subs);
+      // Stop once we have enough for a batch
+      if (allRecipients.length >= BATCH_SIZE) break;
+    }
+    // Trim to batch size
+    allRecipients.splice(BATCH_SIZE);
+
+    // Record skipped (inactive) subscribers so they don't block future batches
+    const activeIds = new Set(allRecipients.map((r) => r.id));
+    const skippedIds = lookAheadIds.filter((id) => !activeIds.has(id) && !alreadySentIds.has(id));
+    // Only record skips for IDs we looked at but weren't active
+    const inactiveSkips = skippedIds.slice(0, lookAheadIds.length);
+    if (inactiveSkips.length > 0) {
+      // Insert skip markers in batches to prevent re-processing
+      for (let i = 0; i < inactiveSkips.length; i += 500) {
+        const chunk = inactiveSkips.slice(i, i + 500);
+        await supabase.from("send_events").insert(
+          chunk.map((id) => ({
+            campaign_id: campaign.id,
+            subscriber_id: id,
+            resend_email_id: null,
+            sent_at: new Date().toISOString(),
+          }))
+        );
+      }
+    }
+
+    if (allRecipients.length === 0) {
+      // No active subscribers left — mark as sent
+      const { count: totalSent } = await supabase
+        .from("send_events")
+        .select("*", { count: "exact", head: true })
+        .eq("campaign_id", campaign.id);
+
+      await supabase.from("campaigns").update({
+        status: "sent",
+        sent_at: new Date().toISOString(),
+        total_recipients: totalSent ?? 0,
+      }).eq("id", campaign.id);
+
+      results.push({ campaign_id: campaign.id, status: "completed", total_sent: totalSent });
+      continue;
     }
 
     // Rewrite links for click tracking
