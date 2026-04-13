@@ -43,6 +43,11 @@ export async function GET(request: NextRequest) {
   const results: any[] = [];
 
   for (const campaign of campaigns) {
+    // Ensure campaign_stats row exists
+    await supabase
+      .from("campaign_stats")
+      .upsert({ campaign_id: campaign.id, opened: 0, clicked: 0, bounced: 0, complained: 0, unsubscribed: 0 }, { onConflict: "campaign_id", ignoreDuplicates: true });
+
     const includeTagIds = campaign.tag_ids || [];
     const excludeTagIds = campaign.exclude_tag_ids || [];
 
