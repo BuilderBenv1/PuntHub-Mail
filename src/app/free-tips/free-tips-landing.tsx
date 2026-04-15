@@ -165,12 +165,12 @@ export function FreeTipsLanding() {
                   margin: "0 0 8px",
                 }}
               >
-                You're in!
+                You&apos;re in!
               </h3>
               <p style={{ color: "#94a3b8", fontSize: "15px", margin: 0, lineHeight: 1.5 }}>
                 Check your inbox for a confirmation email.
                 <br />
-                Click the link and you'll get tomorrow's tips.
+                Click the link and you&apos;ll get tomorrow&apos;s tips.
               </p>
             </div>
           ) : (
@@ -267,7 +267,7 @@ export function FreeTipsLanding() {
             marginBottom: "40px",
           }}
         >
-          What you'll get
+          What you&apos;ll get
         </h2>
 
         <div
