@@ -7,6 +7,7 @@ import {
   updateSegment,
   deleteSegment,
   previewSegmentCount,
+  createTagFromSegment,
 } from "./actions";
 import type { SegmentRule } from "./actions";
 import { Button } from "@/components/ui/button";
@@ -92,6 +93,9 @@ export function SegmentsClient({
   const [rules, setRules] = useState<SegmentRule[]>([{ ...emptyRule }]);
   const [previewCount, setPreviewCount] = useState<number | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [exportSegment, setExportSegment] = useState<any | null>(null);
+  const [exportName, setExportName] = useState("");
+  const [exportLoading, setExportLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -173,6 +177,28 @@ export function SegmentsClient({
     }
   }
 
+  function openExport(segment: any) {
+    setExportSegment(segment);
+    setExportName(`${segment.name} (snapshot)`);
+  }
+
+  async function handleExport() {
+    if (!exportSegment || !exportName.trim()) return;
+    setExportLoading(true);
+    const result = await createTagFromSegment(exportSegment.id, exportName);
+    setExportLoading(false);
+    if (result.error) {
+      toast({ title: "Error", description: result.error, variant: "destructive" });
+      return;
+    }
+    setExportSegment(null);
+    toast({
+      title: "List created",
+      description: `${result.count} subscriber${result.count !== 1 ? "s" : ""} added to "${exportName}"`,
+    });
+    router.refresh();
+  }
+
   async function handleDelete(id: string) {
     setLoading(true);
     const result = await deleteSegment(id);
@@ -207,7 +233,7 @@ export function SegmentsClient({
                 <TableHead>Name</TableHead>
                 <TableHead className="text-center">Rules</TableHead>
                 <TableHead className="text-center">Matching Subscribers</TableHead>
-                <TableHead className="w-[180px]">Actions</TableHead>
+                <TableHead className="w-[260px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -224,6 +250,14 @@ export function SegmentsClient({
                     <div className="flex gap-1">
                       <Button size="sm" variant="outline" onClick={() => openEdit(segment)}>
                         Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => openExport(segment)}
+                        disabled={!segment.matchingCount}
+                      >
+                        Create List
                       </Button>
                       <Button size="sm" variant="destructive" onClick={() => setDeleteId(segment.id)}>
                         Delete
@@ -408,6 +442,36 @@ export function SegmentsClient({
             </Button>
             <Button onClick={handleSave} disabled={loading || !name.trim()}>
               {loading ? "Saving..." : editingId ? "Update" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create List from Segment Dialog */}
+      <Dialog open={!!exportSegment} onOpenChange={(o) => { if (!o) setExportSegment(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create list from segment</DialogTitle>
+            <DialogDescription>
+              Snapshots the {exportSegment?.matchingCount ?? 0} subscribers currently matching
+              &quot;{exportSegment?.name}&quot; into a new list (tag) you can use for sending.
+              Future changes to the segment won&apos;t update this list.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label>List name</Label>
+            <Input
+              value={exportName}
+              onChange={(e) => setExportName(e.target.value)}
+              placeholder="List name"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExportSegment(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleExport} disabled={exportLoading || !exportName.trim()}>
+              {exportLoading ? "Creating..." : "Create List"}
             </Button>
           </DialogFooter>
         </DialogContent>

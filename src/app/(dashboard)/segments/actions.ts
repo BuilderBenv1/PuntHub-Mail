@@ -252,3 +252,52 @@ export async function getAllCampaigns() {
     .order("sent_at", { ascending: false, nullsFirst: false });
   return data || [];
 }
+
+export async function createTagFromSegment(segmentId: string, tagName: string) {
+  const trimmed = tagName.trim();
+  if (!trimmed) return { error: "Tag name is required" };
+
+  const supabase = createServiceClient();
+
+  const { data: segment } = await supabase
+    .from("segments")
+    .select("*")
+    .eq("id", segmentId)
+    .single();
+  if (!segment) return { error: "Segment not found" };
+
+  const subscribers = await evaluateRules(segment.rules || []);
+  if (subscribers.length === 0) {
+    return { error: "Segment has no matching subscribers" };
+  }
+
+  const { data: newTag, error: tagError } = await supabase
+    .from("tags")
+    .insert({
+      name: trimmed,
+      description: `Snapshot of segment "${segment.name}" on ${new Date().toISOString().slice(0, 10)}`,
+    })
+    .select("id")
+    .single();
+  if (tagError) return { error: tagError.message };
+
+  const chunkSize = 500;
+  for (let i = 0; i < subscribers.length; i += chunkSize) {
+    const chunk = subscribers.slice(i, i + chunkSize);
+    const inserts = chunk.map((s: any) => ({
+      subscriber_id: s.id,
+      tag_id: newTag.id,
+    }));
+    const { error: insertError } = await supabase
+      .from("subscriber_tags")
+      .upsert(inserts, {
+        onConflict: "subscriber_id,tag_id",
+        ignoreDuplicates: true,
+      });
+    if (insertError) return { error: insertError.message };
+  }
+
+  revalidatePath("/segments");
+  revalidatePath("/tags");
+  return { success: true, tagId: newTag.id, count: subscribers.length };
+}
