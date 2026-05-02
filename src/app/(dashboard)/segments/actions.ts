@@ -103,49 +103,46 @@ async function evaluateRules(rules: SegmentRule[]) {
   const filteredIds: string[] | null =
     matchingIds === null ? null : Array.from(matchingIds);
 
-  // Build the main query
-  let query = supabase.from("subscribers").select("*");
-
-  // Apply ID filter if needed
-  if (filteredIds !== null) {
-    query = query.in("id", filteredIds);
-  }
-
-  // Apply regular rules
-  for (const rule of regularRules) {
-    switch (rule.field) {
-      case "status":
-        if (rule.operator === "equals") {
-          query = query.eq("status", rule.value);
-        }
-        break;
-
-      case "engagement_score":
-        if (rule.operator === "greater_than") {
-          query = query.gte("engagement_score", parseInt(rule.value));
-        } else if (rule.operator === "less_than") {
-          query = query.lte("engagement_score", parseInt(rule.value));
-        }
-        break;
-
-      case "last_opened_at":
-        if (rule.operator === "after") {
-          query = query.gte("last_opened_at", rule.value);
-        } else if (rule.operator === "before") {
-          query = query.lte("last_opened_at", rule.value);
-        }
-        break;
-
-      case "created_at":
-        if (rule.operator === "after") {
-          query = query.gte("created_at", rule.value);
-        } else if (rule.operator === "before") {
-          query = query.lte("created_at", rule.value);
-        }
-        break;
+  const applyRegularRules = (q: any) => {
+    for (const rule of regularRules) {
+      switch (rule.field) {
+        case "status":
+          if (rule.operator === "equals") q = q.eq("status", rule.value);
+          break;
+        case "engagement_score":
+          if (rule.operator === "greater_than") q = q.gte("engagement_score", parseInt(rule.value));
+          else if (rule.operator === "less_than") q = q.lte("engagement_score", parseInt(rule.value));
+          break;
+        case "last_opened_at":
+          if (rule.operator === "after") q = q.gte("last_opened_at", rule.value);
+          else if (rule.operator === "before") q = q.lte("last_opened_at", rule.value);
+          break;
+        case "created_at":
+          if (rule.operator === "after") q = q.gte("created_at", rule.value);
+          else if (rule.operator === "before") q = q.lte("created_at", rule.value);
+          break;
+      }
     }
+    return q;
+  };
+
+  if (filteredIds !== null) {
+    if (filteredIds.length === 0) return [];
+    const chunkSize = 300;
+    const all: any[] = [];
+    for (let i = 0; i < filteredIds.length; i += chunkSize) {
+      const chunk = filteredIds.slice(i, i + chunkSize);
+      let q = supabase.from("subscribers").select("*").in("id", chunk);
+      q = applyRegularRules(q);
+      const { data, error } = await q;
+      if (error) throw error;
+      if (data) all.push(...data);
+    }
+    return all;
   }
 
+  let query = supabase.from("subscribers").select("*");
+  query = applyRegularRules(query);
   const { data, error } = await query;
   if (error) throw error;
   return data || [];
