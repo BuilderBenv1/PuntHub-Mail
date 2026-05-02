@@ -44,6 +44,8 @@ const FIELD_OPTIONS = [
   { value: "tag", label: "List (Tag)" },
   { value: "last_opened_at", label: "Last Opened At" },
   { value: "created_at", label: "Created At" },
+  { value: "opened_campaign", label: "Opened Campaign" },
+  { value: "clicked_campaign", label: "Clicked Campaign" },
 ];
 
 function getOperatorsForField(field: string) {
@@ -63,6 +65,9 @@ function getOperatorsForField(field: string) {
         { value: "after", label: "After" },
         { value: "before", label: "Before" },
       ];
+    case "opened_campaign":
+    case "clicked_campaign":
+      return [{ value: "equals", label: "Is" }];
     default:
       return [];
   }
@@ -73,9 +78,11 @@ const emptyRule: SegmentRule = { field: "status", operator: "equals", value: "" 
 export function SegmentsClient({
   segments,
   tags,
+  campaigns,
 }: {
   segments: any[];
   tags: any[];
+  campaigns: any[];
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -304,6 +311,27 @@ export function SegmentsClient({
                           {tags.map((t) => (
                             <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                           ))}
+                        </SelectContent>
+                      </Select>
+                    ) : rule.field === "opened_campaign" || rule.field === "clicked_campaign" ? (
+                      <Select
+                        value={rule.value}
+                        onValueChange={(v) => updateRule(index, "value", v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a campaign..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {campaigns.map((c) => {
+                            const sent = c.sent_at
+                              ? new Date(c.sent_at).toLocaleDateString()
+                              : "unsent";
+                            return (
+                              <SelectItem key={c.id} value={c.id}>
+                                {c.subject} — {sent}
+                              </SelectItem>
+                            );
+                          })}
                         </SelectContent>
                       </Select>
                     ) : rule.field === "status" ? (
