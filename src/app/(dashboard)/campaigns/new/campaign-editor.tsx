@@ -98,7 +98,7 @@ export function CampaignEditor({
       } else {
         setEditorMode("html");
       }
-      if (template.subject && !subject) setSubject(template.subject);
+      if (template.subject && !subject.trim()) setSubject(template.subject);
       toast({ title: `Loaded template: ${template.name}` });
     }
   }
@@ -165,12 +165,24 @@ export function CampaignEditor({
 
   async function handleSendTest() {
     const html = await getHtmlFromEditor();
-    if (!testEmailAddr || !subject.trim() || !html.trim()) {
-      toast({ title: "Need subject, HTML body, and test email", variant: "destructive" });
+    const testRecipient = testEmailAddr.trim();
+    const testSubject = subject.trim();
+
+    if (!testRecipient) {
+      toast({ title: "Test email address is required", variant: "destructive" });
       return;
     }
+    if (!testSubject) {
+      toast({ title: "Subject is required", variant: "destructive" });
+      return;
+    }
+    if (!html.trim()) {
+      toast({ title: "Email body is required", variant: "destructive" });
+      return;
+    }
+
     setTestSending(true);
-    const result = await sendTestEmail({ to: testEmailAddr, subject: `[TEST] ${subject}`, html, from_name: fromName, from_email: fromEmail });
+    const result = await sendTestEmail({ to: testRecipient, subject: `[TEST] ${testSubject}`, html, from_name: fromName, from_email: fromEmail });
     setTestSending(false);
     if (result.error) { toast({ title: "Error", description: result.error, variant: "destructive" }); return; }
     toast({ title: "Test email sent!" });
@@ -328,7 +340,7 @@ export function CampaignEditor({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTestEmailOpen(false)}>Cancel</Button>
-            <Button onClick={handleSendTest} disabled={testSending || !testEmailAddr}>{testSending ? "Sending..." : "Send Test"}</Button>
+            <Button onClick={handleSendTest} disabled={testSending || !testEmailAddr.trim()}>{testSending ? "Sending..." : "Send Test"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

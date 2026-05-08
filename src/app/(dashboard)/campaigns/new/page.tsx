@@ -18,7 +18,12 @@ export default async function NewCampaignPage({
       <h1 className="mb-4 sm:mb-6 text-2xl sm:text-3xl font-bold">
         {campaign ? "Edit Campaign" : "New Campaign"}
       </h1>
-      <CampaignEditor tags={tags} templates={templates} existingCampaign={campaign} />
+      <CampaignEditor
+        key={campaign?.id ?? "new"}
+        tags={tags}
+        templates={templates}
+        existingCampaign={campaign}
+      />
     </div>
   );
 }
