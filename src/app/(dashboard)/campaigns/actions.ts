@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { Resend } from "resend";
 import { rewriteLinksForTracking } from "@/lib/track-links";
+import { renderTemplate } from "@/lib/render-template";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -199,7 +200,7 @@ async function getRecipients(includeTagIds: string[], excludeTagIds: string[]) {
     const chunk = finalIds.slice(i, i + chunkSize);
     const { data: subscribers } = await supabase
       .from("subscribers")
-      .select("id, email, unsubscribe_token")
+      .select("id, email, name, unsubscribe_token")
       .in("id", chunk)
       .eq("status", "active");
     if (subscribers) allSubscribers.push(...subscribers);
@@ -295,11 +296,12 @@ export async function sendTestEmail(params: {
   from_email: string;
 }) {
   try {
+    const vars = { name: "Test", email: params.to };
     const { error } = await resend.emails.send({
       from: `${params.from_name} <${params.from_email}>`,
       to: params.to,
-      subject: params.subject,
-      html: params.html,
+      subject: renderTemplate(params.subject, vars),
+      html: renderTemplate(params.html, vars),
     });
     if (error) return { error: error.message };
     return { success: true };
@@ -355,7 +357,7 @@ export async function resendToNonOpeners(campaignId: string, newSubject: string)
   // Find send events where opened_at is null
   const { data: nonOpenerEvents } = await supabase
     .from("send_events")
-    .select("subscriber_id, subscribers(id, email, status, unsubscribe_token)")
+    .select("subscriber_id, subscribers(id, email, name, status, unsubscribe_token)")
     .eq("campaign_id", campaignId)
     .is("opened_at", null);
 
@@ -398,16 +400,21 @@ export async function resendToNonOpeners(campaignId: string, newSubject: string)
 
   for (let idx = 0; idx < activeNonOpeners.length; idx++) {
     const recipient = activeNonOpeners[idx];
-    const html = trackedHtml
-      .replace(/\{unsubscribe_token\}/g, recipient.unsubscribe_token)
-      .replace(/\{subscriber_id\}/g, recipient.id);
+    const vars = { name: recipient.name, email: recipient.email };
+    const html = renderTemplate(
+      trackedHtml
+        .replace(/\{unsubscribe_token\}/g, recipient.unsubscribe_token)
+        .replace(/\{subscriber_id\}/g, recipient.id),
+      vars
+    );
+    const subject = renderTemplate(newSubject, vars);
 
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const { data: emailResult, error: sendError } = await resend.emails.send({
           from: `${campaign.from_name} <${campaign.from_email}>`,
           to: recipient.email,
-          subject: newSubject,
+          subject,
           html,
           replyTo: campaign.reply_to || undefined,
         });

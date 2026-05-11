@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { Resend } from "resend";
+import { renderTemplate } from "@/lib/render-template";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
   // Find all enrollments where status = 'active' and next_send_at <= now
   const { data: enrollments, error } = await supabase
     .from("automation_enrollments")
-    .select("*, subscribers(id, email, status, unsubscribe_token)")
+    .select("*, subscribers(id, email, name, status, unsubscribe_token)")
     .eq("status", "active")
     .lte("next_send_at", now);
 
@@ -73,15 +74,22 @@ export async function GET(request: NextRequest) {
 
     // Send the email via Resend
     try {
-      const html = (step.html_body || "").replace(
-        /\{unsubscribe_token\}/g,
-        enrollment.subscribers.unsubscribe_token || ""
+      const vars = {
+        name: enrollment.subscribers.name,
+        email: enrollment.subscribers.email,
+      };
+      const html = renderTemplate(
+        (step.html_body || "").replace(
+          /\{unsubscribe_token\}/g,
+          enrollment.subscribers.unsubscribe_token || ""
+        ),
+        vars
       );
 
       const { data: emailResult } = await resend.emails.send({
         from: "PuntHub <news@punthub.co.uk>",
         to: enrollment.subscribers.email,
-        subject: step.subject,
+        subject: renderTemplate(step.subject, vars),
         html,
       });
 

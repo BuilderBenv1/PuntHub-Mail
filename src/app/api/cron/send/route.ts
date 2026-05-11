@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { Resend } from "resend";
 import { rewriteLinksForTracking } from "@/lib/track-links";
+import { renderTemplate } from "@/lib/render-template";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -141,7 +142,7 @@ export async function GET(request: NextRequest) {
       const chunk = batchIds.slice(i, i + 500);
       const { data: subs } = await supabase
         .from("subscribers")
-        .select("id, email, unsubscribe_token")
+        .select("id, email, name, unsubscribe_token")
         .in("id", chunk)
         .eq("status", "active");
       if (subs) allRecipients.push(...subs);
@@ -176,16 +177,21 @@ export async function GET(request: NextRequest) {
 
     for (let idx = 0; idx < allRecipients.length; idx++) {
       const recipient = allRecipients[idx];
-      const html = trackedHtml
-        .replace(/\{unsubscribe_token\}/g, recipient.unsubscribe_token || "")
-        .replace(/\{subscriber_id\}/g, recipient.id);
+      const vars = { name: recipient.name, email: recipient.email };
+      const html = renderTemplate(
+        trackedHtml
+          .replace(/\{unsubscribe_token\}/g, recipient.unsubscribe_token || "")
+          .replace(/\{subscriber_id\}/g, recipient.id),
+        vars
+      );
+      const subject = renderTemplate(campaign.subject, vars);
 
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
           const { data: emailResult, error: sendError } = await resend.emails.send({
             from: `${campaign.from_name} <${campaign.from_email}>`,
             to: recipient.email,
-            subject: campaign.subject,
+            subject,
             html,
             replyTo: campaign.reply_to || undefined,
             headers: campaign.preview_text
