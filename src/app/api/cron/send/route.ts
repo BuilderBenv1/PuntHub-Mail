@@ -188,15 +188,21 @@ export async function GET(request: NextRequest) {
 
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://mailsender.punthub.co.uk";
+          const unsubUrl = `${appUrl}/api/unsubscribe?token=${encodeURIComponent(recipient.unsubscribe_token || "")}`;
           const { data: emailResult, error: sendError } = await resend.emails.send({
             from: `${campaign.from_name} <${campaign.from_email}>`,
             to: recipient.email,
             subject,
             html,
             replyTo: campaign.reply_to || undefined,
-            headers: campaign.preview_text
-              ? { "X-Preview-Text": campaign.preview_text }
-              : undefined,
+            headers: {
+              "List-Unsubscribe": `<${unsubUrl}>`,
+              "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+              ...(campaign.preview_text
+                ? { "X-Preview-Text": campaign.preview_text }
+                : {}),
+            },
           });
 
           if (sendError) {

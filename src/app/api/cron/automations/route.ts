@@ -86,11 +86,17 @@ export async function GET(request: NextRequest) {
         vars
       );
 
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://mailsender.punthub.co.uk";
+      const unsubUrl = `${appUrl}/api/unsubscribe?token=${encodeURIComponent(enrollment.subscribers.unsubscribe_token || "")}`;
       const { data: emailResult } = await resend.emails.send({
         from: "PuntHub <news@punthub.co.uk>",
         to: enrollment.subscribers.email,
         subject: renderTemplate(step.subject, vars),
         html,
+        headers: {
+          "List-Unsubscribe": `<${unsubUrl}>`,
+          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        },
       });
 
       // Record the send event
