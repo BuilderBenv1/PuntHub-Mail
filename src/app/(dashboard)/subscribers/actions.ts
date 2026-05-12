@@ -248,35 +248,79 @@ export async function exportSubscribers(params: {
   return [header, ...csvRows].join("\n");
 }
 
-export async function findDormantSubscribers() {
+export async function findDormantSubscribers(opts?: {
+  sourceTagId?: string;
+  days?: number;
+  minSubscribedDays?: number;
+}) {
   const supabase = createServiceClient();
 
-  const ninetyDaysAgo = new Date();
-  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+  const days = opts?.days ?? 90;
+  const minSubscribedDays = opts?.minSubscribedDays ?? 14;
+  const sourceTagId = opts?.sourceTagId;
 
-  const { data, error } = await supabase
-    .from("subscribers")
-    .select("*, subscriber_tags(tag_id, tags(id, name))")
-    .eq("status", "active")
-    .or(
-      `last_opened_at.is.null,last_opened_at.lt.${ninetyDaysAgo.toISOString()}`
-    )
-    .order("email");
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
 
-  if (error) throw error;
+  const subscribedBefore = new Date();
+  subscribedBefore.setDate(subscribedBefore.getDate() - minSubscribedDays);
 
-  return (data || []).map((sub: any) => ({
+  let taggedIds: string[] | null = null;
+  if (sourceTagId) {
+    const ids: string[] = [];
+    let from = 0;
+    while (true) {
+      const { data: page } = await supabase
+        .from("subscriber_tags")
+        .select("subscriber_id")
+        .eq("tag_id", sourceTagId)
+        .range(from, from + 999);
+      if (!page || page.length === 0) break;
+      page.forEach((r: any) => ids.push(r.subscriber_id));
+      if (page.length < 1000) break;
+      from += 1000;
+    }
+    taggedIds = ids;
+    if (taggedIds.length === 0) return [];
+  }
+
+  const matches: any[] = [];
+  const chunkSize = 300;
+  const chunks =
+    taggedIds === null
+      ? [null as null]
+      : Array.from({ length: Math.ceil(taggedIds.length / chunkSize) }, (_, i) =>
+          taggedIds!.slice(i * chunkSize, (i + 1) * chunkSize)
+        );
+
+  for (const chunk of chunks) {
+    let q = supabase
+      .from("subscribers")
+      .select("*, subscriber_tags(tag_id, tags(id, name))")
+      .eq("status", "active")
+      .lte("subscribed_at", subscribedBefore.toISOString())
+      .or(`last_opened_at.is.null,last_opened_at.lt.${cutoff.toISOString()}`)
+      .order("email");
+
+    if (chunk !== null) q = q.in("id", chunk);
+
+    const { data, error } = await q;
+    if (error) throw error;
+    if (data) matches.push(...data);
+  }
+
+  return matches.map((sub: any) => ({
     ...sub,
-    tags: (sub.subscriber_tags || [])
-      .map((st: any) => st.tags)
-      .filter(Boolean),
+    tags: (sub.subscriber_tags || []).map((st: any) => st.tags).filter(Boolean),
   }));
 }
 
-export async function markDormant(subscriberIds: string[]) {
+export async function markDormant(
+  subscriberIds: string[],
+  opts?: { removeFromTagId?: string }
+) {
   const supabase = createServiceClient();
 
-  // Find or create DORMANT V2 tag
   let { data: tag } = await supabase
     .from("tags")
     .select("id")
@@ -294,19 +338,27 @@ export async function markDormant(subscriberIds: string[]) {
 
   if (!tag) return { error: "Failed to create DORMANT V2 tag" };
 
-  // Update status and assign tag
-  for (const id of subscriberIds) {
+  const chunkSize = 300;
+  for (let i = 0; i < subscriberIds.length; i += chunkSize) {
+    const chunk = subscriberIds.slice(i, i + chunkSize);
+
     await supabase
       .from("subscribers")
       .update({ status: "dormant" })
-      .eq("id", id);
+      .in("id", chunk);
 
+    if (opts?.removeFromTagId) {
+      await supabase
+        .from("subscriber_tags")
+        .delete()
+        .eq("tag_id", opts.removeFromTagId)
+        .in("subscriber_id", chunk);
+    }
+
+    const inserts = chunk.map((id) => ({ subscriber_id: id, tag_id: tag!.id }));
     await supabase
       .from("subscriber_tags")
-      .upsert(
-        { subscriber_id: id, tag_id: tag.id },
-        { onConflict: "subscriber_id,tag_id" }
-      );
+      .upsert(inserts, { onConflict: "subscriber_id,tag_id", ignoreDuplicates: true });
   }
 
   revalidatePath("/subscribers");

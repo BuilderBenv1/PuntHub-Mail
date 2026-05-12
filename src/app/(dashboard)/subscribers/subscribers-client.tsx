@@ -306,7 +306,7 @@ export function SubscribersClient({
       />
 
       {/* Dormant tool dialog */}
-      <DormantDialog open={dormantOpen} onOpenChange={setDormantOpen} />
+      <DormantDialog open={dormantOpen} onOpenChange={setDormantOpen} tags={tags} />
     </div>
   );
 }
