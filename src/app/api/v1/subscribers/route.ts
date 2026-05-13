@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   if (!auth.authenticated) return auth.error!;
 
   const body = await request.json();
-  const { email, name, tags } = body;
+  const { email, name, tags, list_ids } = body;
 
   if (!email) {
     return NextResponse.json({ error: "Email is required" }, { status: 400 });
@@ -29,24 +29,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Assign tags if provided
-  if (tags && Array.isArray(tags) && tags.length > 0) {
-    // Look up tag IDs by name
+  const tagIdsToAssign = new Set<string>();
+
+  if (Array.isArray(list_ids)) {
+    for (const id of list_ids) {
+      if (typeof id === "string" && id.length > 0) tagIdsToAssign.add(id);
+    }
+  }
+
+  if (Array.isArray(tags) && tags.length > 0) {
     const { data: tagRecords } = await supabase
       .from("tags")
       .select("id, name")
       .in("name", tags);
+    for (const tag of tagRecords || []) tagIdsToAssign.add(tag.id);
+  }
 
-    if (tagRecords && tagRecords.length > 0) {
-      for (const tag of tagRecords) {
-        await supabase
-          .from("subscriber_tags")
-          .upsert(
-            { subscriber_id: subscriber.id, tag_id: tag.id },
-            { onConflict: "subscriber_id,tag_id" }
-          );
-      }
-    }
+  if (tagIdsToAssign.size > 0) {
+    const inserts = Array.from(tagIdsToAssign).map((tag_id) => ({
+      subscriber_id: subscriber.id,
+      tag_id,
+    }));
+    await supabase
+      .from("subscriber_tags")
+      .upsert(inserts, { onConflict: "subscriber_id,tag_id", ignoreDuplicates: true });
   }
 
   return NextResponse.json({ success: true, subscriber });
