@@ -118,7 +118,7 @@ export function CampaignsClient({ campaigns }: { campaigns: any[] }) {
                   <TableCell className="hidden md:table-cell text-right">{c.total_recipients}</TableCell>
                   <TableCell className="hidden md:table-cell text-right">{c.openRate}%</TableCell>
                   <TableCell className="hidden lg:table-cell text-right">{c.clickRate}%</TableCell>
-                  <TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     <div className="flex flex-wrap gap-1">
                       {c.status === "draft" && <Link href={`/campaigns/new?id=${c.id}`}><Button size="sm" variant="outline">Edit</Button></Link>}
                       {c.status === "scheduled" && <Button size="sm" variant="outline" onClick={() => handleCancel(c.id)} disabled={loading}>Cancel</Button>}
