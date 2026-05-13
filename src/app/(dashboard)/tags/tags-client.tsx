@@ -169,12 +169,30 @@ export function TagsClient({ initialTags }: { initialTags: Tag[] }) {
                         className="h-8"
                       />
                     ) : (
-                      <Link
-                        href={`/subscribers?tag=${tag.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {tag.name}
-                      </Link>
+                      <div className="space-y-1">
+                        <Link
+                          href={`/subscribers?tag=${tag.id}`}
+                          className="font-medium hover:underline"
+                        >
+                          {tag.name}
+                        </Link>
+                        <div className="flex items-center gap-1">
+                          <code className="text-[10px] text-muted-foreground font-mono">
+                            {tag.id}
+                          </code>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-5 px-1.5 text-[10px]"
+                            onClick={() => {
+                              navigator.clipboard.writeText(tag.id);
+                              toast({ title: "List ID copied" });
+                            }}
+                          >
+                            Copy
+                          </Button>
+                        </div>
+                      </div>
                     )}
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
