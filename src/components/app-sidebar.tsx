@@ -13,6 +13,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { logout } from "@/app/login/actions";
@@ -32,11 +33,15 @@ const navItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar();
+  const closeOnMobile = () => {
+    if (isMobile) setOpenMobile(false);
+  };
 
   return (
     <Sidebar>
       <SidebarHeader className="border-b px-6 py-4">
-        <Link href="/" className="text-xl font-bold">
+        <Link href="/" className="text-xl font-bold" onClick={closeOnMobile}>
           PuntHub Mail
         </Link>
       </SidebarHeader>
@@ -55,7 +60,7 @@ export function AppSidebar() {
                         : pathname.startsWith(item.href)
                     }
                   >
-                    <Link href={item.href}>
+                    <Link href={item.href} onClick={closeOnMobile}>
                       <span>{item.icon}</span>
                       <span>{item.title}</span>
                     </Link>
